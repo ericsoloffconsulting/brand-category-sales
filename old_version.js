@@ -112,16 +112,12 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 var brand2Id = params.brand2 !== undefined ? params.brand2 : '26';  // Default: GE
                 var brand3Id = params.brand3 !== undefined ? params.brand3 : '15';  // Default: CAFE
                 var brand4Id = params.brand4 !== undefined ? params.brand4 : '43';  // Default: MONOGRAM
-                var brand5Id = params.brand5 !== undefined ? params.brand5 : '32';  // Default: HOTPOINT
-                var brand6Id = params.brand6 !== undefined ? params.brand6 : '30';  // Default: HAIER
                 
                 log.debug('Brand Parameters', {
                     brand1: brand1Id,
                     brand2: brand2Id,
                     brand3: brand3Id,
-                    brand4: brand4Id,
-                    brand5: brand5Id,
-                    brand6: brand6Id
+                    brand4: brand4Id
                 });
 
                 var html = '';
@@ -168,8 +164,8 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     
                     // Brand selectors
                     html += '<div style="margin-bottom:20px;">';
-                    html += '<div style="margin-bottom:10px;font-weight:500;color:#555;">Selected Brands (Choose up to 6):</div>';
-                    html += buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
+                    html += '<div style="margin-bottom:10px;font-weight:500;color:#555;">Selected Brands (Choose up to 4):</div>';
+                    html += buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id);
                     html += '</div>';
                     
                     html += '</div>';
@@ -190,8 +186,6 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     html += '  var brand2 = document.getElementById("brand2").value;';
                     html += '  var brand3 = document.getElementById("brand3").value;';
                     html += '  var brand4 = document.getElementById("brand4").value;';
-                    html += '  var brand5 = document.getElementById("brand5").value;';
-                    html += '  var brand6 = document.getElementById("brand6").value;';
                     html += '  var url = "' + scriptUrl + '" + "' + separator + 'loadData=T";';
                     html += '  if (startDate) url += "&startdate=" + encodeURIComponent(startDate);';
                     html += '  if (endDate) url += "&enddate=" + encodeURIComponent(endDate);';
@@ -199,8 +193,6 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     html += '  url += "&brand2=" + encodeURIComponent(brand2);';
                     html += '  url += "&brand3=" + encodeURIComponent(brand3);';
                     html += '  url += "&brand4=" + encodeURIComponent(brand4);';
-                    html += '  url += "&brand5=" + encodeURIComponent(brand5);';
-                    html += '  url += "&brand6=" + encodeURIComponent(brand6);';
                     html += '  window.location.href = url;';
                     html += '}';
                     html += '</script>';
@@ -219,11 +211,11 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 if (viewMode === 'detail') {
                     // Show detail view
                     var department = params.department || '';
-                    html += buildDetailView(filterClass1, filterClass2, filterClass3, filterBrand, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
+                    html += buildDetailView(filterClass1, filterClass2, filterClass3, filterBrand, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
                 } else {
                     // Show summary view
                     var department = params.department || '';
-                    html += buildSummaryView(scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
+                    html += buildSummaryView(scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
                 }
 
                 html += '</div>'; // Close portal-container
@@ -267,7 +259,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
          * @param {string} brand4Id - Brand 4 ID
          * @returns {string} HTML content
          */
-        function buildSummaryView(scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
+        function buildSummaryView(scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var html = '';
             
             // Load brand list for selectors
@@ -289,7 +281,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             // Brand selectors
             html += '<div style="margin-top: 15px;">';
             html += '<div style="margin-bottom: 8px; font-weight: 500; color: #555;">Selected Brands:</div>';
-            html += buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
+            html += buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id);
             html += '</div>';
             
             html += '<div style="margin-top: 15px;">';
@@ -299,7 +291,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '</div>';
 
             // Get summary data
-            var summaryDataResult = getSummaryData(startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
+            var summaryDataResult = getSummaryData(startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
             var summaryData = summaryDataResult.records;
             var categoryTotals = summaryDataResult.categoryTotals;
             var selectedBrands = summaryDataResult.selectedBrands;
@@ -310,10 +302,12 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '<input type="text" id="searchCategory-summary" class="search-box" placeholder="Search Category..." onkeyup="filterTable(\'summary\')" style="flex:1;">';
             html += '<input type="text" id="searchSubCategory-summary" class="search-box" placeholder="Search Sub-Category..." onkeyup="filterTable(\'summary\')" style="flex:1;">';
             html += '<input type="text" id="searchConfiguration-summary" class="search-box" placeholder="Search Configuration..." onkeyup="filterTable(\'summary\')" style="flex:1;">';
+            html += '<button type="button" class="clear-btn" onclick="clearSearchAndRecalc(\'summary\')" title="Clear all filters and recalculate percentages">Clear</button>';
+            html += '<button type="button" class="filter-btn" onclick="recalculatePercentages(\'summary\')" title="Recalculate percentages based on visible rows only">🔄 Recalc</button>';
             html += '<button type="button" class="export-btn" onclick="exportToExcel(\'summary\')">📥 Export to Excel</button>';
             html += '</div>';
             html += '<span class="search-results-count" id="searchCount-summary"></span>';
-            html += buildSummaryTable(summaryData, categoryTotals, selectedBrands, brandCount, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
+            html += buildSummaryTable(summaryData, categoryTotals, selectedBrands, brandCount, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
             html += '</div>';
 
             return html;
@@ -335,7 +329,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
          * @param {string} brand4Id - Brand 4 ID
          * @returns {string} HTML content
          */
-        function buildDetailView(class1, class2, class3, brand, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
+        function buildDetailView(class1, class2, class3, brand, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var html = '';
             
             // Back button with date params and brand params
@@ -366,7 +360,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '</div>';
 
             // Get detail data
-            var detailData = getDetailData(class1, class2, class3, brand, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
+            var detailData = getDetailData(class1, class2, class3, brand, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
 
             // Display record count
             html += '<div class="record-count">';
@@ -403,14 +397,14 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
          * @param {string} department - Department filter
          * @returns {Object} Summary data with category totals
          */
-function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
+function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var results = [];
             var categoryTotals = {};
             
             try {
                 // Get brand list and filter selected brands
                 var brandList = getBrandList();
-                var brandIds = [brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id].filter(function(id) { return id && id !== ''; });
+                var brandIds = [brand1Id, brand2Id, brand3Id, brand4Id].filter(function(id) { return id && id !== ''; });
                 log.debug('Brand IDs', 'brandIds: ' + JSON.stringify(brandIds));
                 
                 var selectedBrands = getBrandNames(brandList, brandIds);
@@ -618,15 +612,15 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
          * @param {string} brand4Id - Selected brand 4 ID
          * @returns {string} HTML for brand selector dropdowns
          */
-        function buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
+        function buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id) {
             var html = '';
             
             html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">';
             
-            var brandIds = [brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id];
-            var labels = ['Brand 1:', 'Brand 2:', 'Brand 3:', 'Brand 4:', 'Brand 5:', 'Brand 6:'];
+            var brandIds = [brand1Id, brand2Id, brand3Id, brand4Id];
+            var labels = ['Brand 1:', 'Brand 2:', 'Brand 3:', 'Brand 4:'];
             
-            for (var b = 0; b < 6; b++) {
+            for (var b = 0; b < 4; b++) {
                 html += '<div>';
                 html += '<label for="brand' + (b + 1) + '" style="display: block; margin-bottom: 5px; font-weight: 500;">' + labels[b] + '</label>';
                 html += '<select id="brand' + (b + 1) + '" name="brand' + (b + 1) + '" style="padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; width: 100%;">';
@@ -666,12 +660,12 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
          * @param {string} brand4Id - Brand 4 ID
          * @returns {Object} Detail data with count info
          */
-        function getDetailData(class1, class2, class3, brand, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
+        function getDetailData(class1, class2, class3, brand, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var results = [];
             var totalCount = 0;
             
             // Build list of selected brand IDs for comparison
-            var selectedBrandIds = [brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id].filter(function(id) { return id && id !== ''; });
+            var selectedBrandIds = [brand1Id, brand2Id, brand3Id, brand4Id].filter(function(id) { return id && id !== ''; });
 
             try {
                 // First, get the total count
@@ -882,7 +876,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
          * @param {string} brand4Id - Brand 4 ID
          * @returns {string} HTML table
          */
-        function buildSummaryTable(data, categoryTotals, selectedBrands, brandCount, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
+        function buildSummaryTable(data, categoryTotals, selectedBrands, brandCount, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var html = '';
 
             html += '<div class="table-container">';
@@ -970,8 +964,6 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 if (brand2Id) brandParams += '&brand2=' + encodeURIComponent(brand2Id);
                 if (brand3Id) brandParams += '&brand3=' + encodeURIComponent(brand3Id);
                 if (brand4Id) brandParams += '&brand4=' + encodeURIComponent(brand4Id);
-                if (brand5Id) brandParams += '&brand5=' + encodeURIComponent(brand5Id);
-                if (brand6Id) brandParams += '&brand6=' + encodeURIComponent(brand6Id);
                 
                 // URL with only Category
                 var class1Url = baseUrl + '&class1=' + encodeURIComponent(row.class1) + dateParams + brandParams;
@@ -1201,7 +1193,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '.section-description { font-style: italic; color: #666; margin: 0 0 20px 0; font-size: 14px; }' +
                 '' +
                 '/* Date filter section */' +
-                '.date-filter-section { background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 15px; margin-bottom: 20px; width: 100%; box-sizing: border-box; }' +
+                '.date-filter-section { background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 15px; margin-bottom: 20px; }' +
                 '.date-filter-inputs { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }' +
                 '.date-filter-inputs label { font-weight: 600; color: #333; font-size: 14px; }' +
                 '.date-filter-inputs input[type="date"] { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; }' +
@@ -1226,11 +1218,11 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '.search-section { margin-bottom: 30px; }' +
                 '' +
                 '/* Search box container */' +
-                '.search-box-container { margin: 0 0 15px 0; padding: 12px 10px; background: white; border-bottom: 3px solid #4CAF50; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); display: flex; gap: 10px; align-items: center; width: 100%; box-sizing: border-box; }' +
-                '.search-box { flex: 1; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; box-sizing: border-box; min-width: 0; }' +
+                '.search-box-container { margin: 0 0 15px 0; padding: 12px 10px; background: white; border-bottom: 3px solid #4CAF50; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); display: flex; gap: 10px; align-items: center; }' +
+                '.search-box { flex: 1; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; box-sizing: border-box; }' +
                 '.search-box:focus { outline: none; border-color: #4CAF50; box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.15); }' +
-                '.search-results-count { display: none; margin-left: 10px; color: #6c757d; font-size: 13px; font-style: italic; white-space: nowrap; }' +
-                '.export-btn { padding: 10px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.2s; flex-shrink: 0; }' +
+                '.search-results-count { display: none; margin-left: 10px; color: #6c757d; font-size: 13px; font-style: italic; }' +
+                '.export-btn { padding: 10px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.2s; }' +
                 '.export-btn:hover { background: #45a049; }' +
                 '.export-btn:active { background: #3d8b40; }' +
                 '' +
@@ -1272,13 +1264,10 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
         function getJavaScript(scriptUrl) {
             return '' +
                 '/* Format currency value */' +
-                'function formatCurrency(value, preserveSign) {' +
+                'function formatCurrency(value) {' +
                 '    if (!value && value !== 0) return \'$0.00\';' +
                 '    var absValue = Math.abs(value);' +
                 '    var formatted = \'$\' + absValue.toFixed(2).replace(/\\d(?=(\\d{3})+\\.)/g, \'$&,\');' +
-                '    if (preserveSign && value < 0) {' +
-                '        formatted = \'(\' + formatted + \')\';' +
-                '    }' +
                 '    return formatted;' +
                 '}' +
                 '' +
@@ -1291,8 +1280,6 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    var brand2 = document.getElementById("brand2").value;' +
                 '    var brand3 = document.getElementById("brand3").value;' +
                 '    var brand4 = document.getElementById("brand4").value;' +
-                '    var brand5 = document.getElementById("brand5").value;' +
-                '    var brand6 = document.getElementById("brand6").value;' +
                 '    var overlay = document.getElementById("loadingOverlay");' +
                 '    if (overlay) overlay.style.display = "flex";' +
                 '    var url = "' + scriptUrl + '&loadData=T";' +
@@ -1303,8 +1290,6 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    url += "&brand2=" + encodeURIComponent(brand2);' +
                 '    url += "&brand3=" + encodeURIComponent(brand3);' +
                 '    url += "&brand4=" + encodeURIComponent(brand4);' +
-                '    url += "&brand5=" + encodeURIComponent(brand5);' +
-                '    url += "&brand6=" + encodeURIComponent(brand6);' +
                 '    window.location.href = url;' +
                 '}' +
                 '' +
@@ -1320,7 +1305,6 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '' +
                 '/* Filter table */' +
                 'function filterTable(sectionId) {' +
-                '    console.log(\'filterTable called with sectionId:\', sectionId);' +
                 '    var categoryInput = document.getElementById(\'searchCategory-\' + sectionId);' +
                 '    var subCategoryInput = document.getElementById(\'searchSubCategory-\' + sectionId);' +
                 '    var configurationInput = document.getElementById(\'searchConfiguration-\' + sectionId);' +
@@ -1332,7 +1316,6 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    var configurationFilter = configurationInput ? configurationInput.value.toUpperCase() : \'\';' +
                 '    var generalFilter = generalSearchInput ? generalSearchInput.value.toUpperCase() : \'\';' +
                 '    var brandFilter = selectedBrandFilter ? selectedBrandFilter.value : \'both\';' +
-                '    console.log(\'Filters - general:\', generalFilter, \', brand:\', brandFilter);' +
                 '    ' +
                 '    var tbody = document.querySelector(\'#table-\' + sectionId + \' tbody\');' +
                 '    var rows = tbody.querySelectorAll(\'tr:not(.summary-row)\');' +
@@ -1383,17 +1366,6 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        countSpan.style.display = \'inline\';' +
                 '    } else {' +
                 '        countSpan.style.display = \'none\';' +
-                '    }' +
-                '    ' +
-                '    console.log(\'About to check sectionId for recalc. sectionId=\', sectionId);' +
-                '    if (sectionId === \'summary\') {' +
-                '        console.log(\'Calling recalculatePercentages\');' +
-                '        recalculatePercentages(sectionId);' +
-                '    } else if (sectionId === \'detail\') {' +
-                '        console.log(\'Calling recalculateDetailTotals\');' +
-                '        recalculateDetailTotals();' +
-                '    } else {' +
-                '        console.log(\'No recalc - sectionId did not match\');' +
                 '    }' +
                 '}' +
                 '' +
@@ -1528,65 +1500,6 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    XLSX.writeFile(wb, fileName);' +
                 '}' +
                 '' +
-                '/* Recalculate detail view totals based on visible rows */' +
-                'function recalculateDetailTotals() {' +
-                '    console.log(\'recalculateDetailTotals called\');' +
-                '    var table = document.getElementById(\'table-detail\');' +
-                '    if (!table) {' +
-                '        console.log(\'No table found\');' +
-                '        return;' +
-                '    }' +
-                '    var tbody = table.querySelector(\'tbody\');' +
-                '    var rows = tbody.querySelectorAll(\'tr:not(.summary-row)\');' +
-                '    console.log(\'Found \' + rows.length + \' data rows\');' +
-                '    var summaryRow = tbody.querySelector(\'.summary-row\');' +
-                '    if (!summaryRow) {' +
-                '        console.log(\'No summary row found\');' +
-                '        return;' +
-                '    }' +
-                '    ' +
-                '    var totals = {' +
-                '        quantity: 0,' +
-                '        amount: 0' +
-                '    };' +
-                '    ' +
-                '    for (var i = 0; i < rows.length; i++) {' +
-                '        var row = rows[i];' +
-                '        if (row.style.display === \'none\') continue;' +
-                '        ' +
-                '        var cells = row.cells;' +
-                '        var qtyCell = cells[10];' +
-                '        var amountCell = cells[12];' +
-                '        ' +
-                '        if (qtyCell) {' +
-                '            var qty = parseFloat(qtyCell.textContent) || 0;' +
-                '            totals.quantity += qty;' +
-                '            console.log(\'Row \' + i + \' qty: \' + qty + \', running total: \' + totals.quantity);' +
-                '        }' +
-                '        ' +
-                '        if (amountCell) {' +
-                '            var amount = parseFloat(amountCell.getAttribute(\'data-value\')) || 0;' +
-                '            totals.amount += amount;' +
-                '            console.log(\'Row \' + i + \' amount: \' + amount + \', running total: \' + totals.amount);' +
-                '        }' +
-                '    }' +
-                '    ' +
-                '    console.log(\'Final totals - qty: \' + totals.quantity + \', amount: \' + totals.amount);' +
-                '    var summaryCells = summaryRow.cells;' +
-                '    console.log(\'Summary row has \' + summaryCells.length + \' cells\');' +
-                '    if (summaryCells[1]) {' +
-                '        summaryCells[1].textContent = totals.quantity.toFixed(2);' +
-                '        console.log(\'Updated cell 1 (quantity) to: \' + totals.quantity.toFixed(2));' +
-                '    }' +
-                '    if (summaryCells[3]) {' +
-                '        var formattedAmount = formatCurrency(totals.amount, true);' +
-                '        console.log(\'Formatted amount: \' + formattedAmount);' +
-                '        summaryCells[3].textContent = formattedAmount;' +
-                '        summaryCells[3].setAttribute(\'data-value\', totals.amount);' +
-                '        console.log(\'Updated cell 3 (amount) to: \' + formattedAmount);' +
-                '    }' +
-                '}' +
-                '' +
                 '/* Recalculate percentages and totals based on visible rows */' +
                 'function recalculatePercentages(sectionId) {' +
                 '    var table = document.getElementById(\'table-\' + sectionId);' +
@@ -1709,6 +1622,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '            summaryCells[cellIndex].textContent = grandTotals.lineCount;' +
                 '        }' +
                 '    }' +
+                '    alert(\'Totals and percentages recalculated based on \' + Object.keys(categoryTotals).length + \' visible categor(ies)!\');' +
                 '}';
         }
 
