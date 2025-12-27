@@ -105,6 +105,20 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 var filterBrand = params.brand || null;
                 var startDate = params.startdate || '2025-01-01';
                 var endDate = params.enddate || '2025-12-31';
+                
+                // Extract brand parameters with defaults only on initial load
+                // If params exist (even as empty string), use them; only default when undefined
+                var brand1Id = params.brand1 !== undefined ? params.brand1 : '48';  // Default: PROFILE
+                var brand2Id = params.brand2 !== undefined ? params.brand2 : '26';  // Default: GE
+                var brand3Id = params.brand3 !== undefined ? params.brand3 : '15';  // Default: CAFE
+                var brand4Id = params.brand4 !== undefined ? params.brand4 : '43';  // Default: MONOGRAM
+                
+                log.debug('Brand Parameters', {
+                    brand1: brand1Id,
+                    brand2: brand2Id,
+                    brand3: brand3Id,
+                    brand4: brand4Id
+                });
 
                 var html = '';
 
@@ -120,16 +134,23 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     var separator = scriptUrl.indexOf('?') > -1 ? '&' : '?';
                     var loadDataUrl = scriptUrl + separator + 'loadData=T&startdate=' + startDate + '&enddate=' + endDate;
                     
+                    // Load brand list for selectors
+                    var brandList = getBrandList();
+                    
                     html += '<style>' + getStyles() + '</style>';
                     html += '<div class="portal-container">';
-                    html += '<div style="text-align:center;padding:80px 20px;">';
-                    html += '<h1 style="color:#1a237e;font-size:32px;margin-bottom:20px;">Brand Category Sales Report</h1>';
-                    html += '<p style="color:#666;font-size:16px;margin-bottom:30px;">View invoice and credit memo sales data by brand and product classification</p>';
+                    html += '<div style="text-align:center;padding:15px 20px;">';
+                    html += '<h1 style="color:#1a237e;font-size:32px;margin-bottom:10px;">Sales by Brand and Product Category</h1>';
+                    html += '<p style="color:#666;font-size:16px;margin-bottom:20px;">Invoice and Credit Memo Inventory Line Items<br/>Split by Category, Sub-Category and Configuration.</p>';
                     
-                    // Date filter section on landing page
-                    html += '<div style="max-width:500px;margin:0 auto 30px auto;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:20px;">';
-                    html += '<div style="margin-bottom:15px;font-weight:600;color:#333;">Select Date Range:</div>';
-                    html += '<div style="display:flex;gap:15px;align-items:center;justify-content:center;flex-wrap:wrap;">';
+                    // Filters section on landing page
+                    html += '<div style="max-width:700px;margin:0 auto 20px auto;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:25px;">';
+                    html += '<div style="margin-bottom:20px;font-weight:600;color:#333;font-size:18px;text-align:center;">Report Filters</div>';
+                    
+                    // Date filter section
+                    html += '<div style="margin-bottom:25px;">';
+                    html += '<div style="margin-bottom:10px;font-weight:500;color:#555;">Date Range:</div>';
+                    html += '<div style="display:flex;gap:15px;justify-content:center;flex-wrap:wrap;">';
                     html += '<div style="display:flex;flex-direction:column;gap:5px;">';
                     html += '<label for="startdate_landing" style="font-size:14px;color:#666;">Start Date:</label>';
                     html += '<input type="date" id="startdate_landing" value="' + startDate + '" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;">';
@@ -139,6 +160,14 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     html += '<input type="date" id="enddate_landing" value="' + endDate + '" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;">';
                     html += '</div>';
                     html += '</div>';
+                    html += '</div>';
+                    
+                    // Brand selectors
+                    html += '<div style="margin-bottom:20px;">';
+                    html += '<div style="margin-bottom:10px;font-weight:500;color:#555;">Selected Brands (Choose up to 4):</div>';
+                    html += buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id);
+                    html += '</div>';
+                    
                     html += '</div>';
                     
                     html += '<button onclick="loadReportData()" id="loadDataBtn" style="padding:15px 40px;font-size:18px;font-weight:bold;color:#fff;background:#4CAF50;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 8px rgba(76,175,80,0.3);transition:all 0.2s;">Load Report Data</button>';
@@ -153,9 +182,17 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     html += '  if (overlay) overlay.style.display = "flex";';
                     html += '  var startDate = document.getElementById("startdate_landing").value;';
                     html += '  var endDate = document.getElementById("enddate_landing").value;';
+                    html += '  var brand1 = document.getElementById("brand1").value;';
+                    html += '  var brand2 = document.getElementById("brand2").value;';
+                    html += '  var brand3 = document.getElementById("brand3").value;';
+                    html += '  var brand4 = document.getElementById("brand4").value;';
                     html += '  var url = "' + scriptUrl + '" + "' + separator + 'loadData=T";';
                     html += '  if (startDate) url += "&startdate=" + encodeURIComponent(startDate);';
                     html += '  if (endDate) url += "&enddate=" + encodeURIComponent(endDate);';
+                    html += '  url += "&brand1=" + encodeURIComponent(brand1);';
+                    html += '  url += "&brand2=" + encodeURIComponent(brand2);';
+                    html += '  url += "&brand3=" + encodeURIComponent(brand3);';
+                    html += '  url += "&brand4=" + encodeURIComponent(brand4);';
                     html += '  window.location.href = url;';
                     html += '}';
                     html += '</script>';
@@ -174,11 +211,11 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 if (viewMode === 'detail') {
                     // Show detail view
                     var department = params.department || '';
-                    html += buildDetailView(filterClass1, filterClass2, filterClass3, filterBrand, scriptUrl, startDate, endDate, department);
+                    html += buildDetailView(filterClass1, filterClass2, filterClass3, filterBrand, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
                 } else {
                     // Show summary view
                     var department = params.department || '';
-                    html += buildSummaryView(scriptUrl, startDate, endDate, department);
+                    html += buildSummaryView(scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
                 }
 
                 html += '</div>'; // Close portal-container
@@ -216,14 +253,21 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
          * @param {string} startDate - Start date filter
          * @param {string} endDate - End date filter
          * @param {string} department - Department filter
+         * @param {string} brand1Id - Brand 1 ID
+         * @param {string} brand2Id - Brand 2 ID
+         * @param {string} brand3Id - Brand 3 ID
+         * @param {string} brand4Id - Brand 4 ID
          * @returns {string} HTML content
          */
-        function buildSummaryView(scriptUrl, startDate, endDate, department) {
+        function buildSummaryView(scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var html = '';
+            
+            // Load brand list for selectors
+            var brandList = getBrandList();
             
             html += '<div class="section-description">Invoice and Credit Memo Inventory Line Items, Split by Category, Sub-Category and Configuration. Click Any Row for Drill Down Transaction Details.</div>';
 
-            // Date filter section
+            // Date and brand filter section
             html += '<div class="date-filter-section">';
             html += '<div class="date-filter-inputs">';
             html += '<label for="startdate">Start Date:</label>';
@@ -232,15 +276,26 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '<input type="date" id="enddate" name="enddate" value="' + (endDate || '') + '">';
             html += '<label for="department">Selling Location:</label>';
             html += '<input type="text" id="department" name="department" value="' + (department || '') + '" placeholder="Enter location..." style="padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; width: 200px;">';
+            html += '</div>';
+            
+            // Brand selectors
+            html += '<div style="margin-top: 15px;">';
+            html += '<div style="margin-bottom: 8px; font-weight: 500; color: #555;">Selected Brands:</div>';
+            html += buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id);
+            html += '</div>';
+            
+            html += '<div style="margin-top: 15px;">';
             html += '<button type="button" class="filter-btn" onclick="applyDateFilter()">Apply Filter</button>';
-            html += '<button type="button" class="clear-btn" onclick="clearDateFilter()">Clear</button>';
+            html += '<button type="button" class="clear-btn" onclick="clearDateFilter()" style="margin-left: 10px;">Clear</button>';
             html += '</div>';
             html += '</div>';
 
             // Get summary data
-            var summaryDataResult = getSummaryData(startDate, endDate, department);
+            var summaryDataResult = getSummaryData(startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
             var summaryData = summaryDataResult.records;
             var categoryTotals = summaryDataResult.categoryTotals;
+            var selectedBrands = summaryDataResult.selectedBrands;
+            var brandCount = summaryDataResult.brandCount;
 
             html += '<div class="search-section">';
             html += '<div class="search-box-container">';
@@ -252,7 +307,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '<button type="button" class="export-btn" onclick="exportToExcel(\'summary\')">📥 Export to Excel</button>';
             html += '</div>';
             html += '<span class="search-results-count" id="searchCount-summary"></span>';
-            html += buildSummaryTable(summaryData, categoryTotals, scriptUrl, startDate, endDate, department);
+            html += buildSummaryTable(summaryData, categoryTotals, selectedBrands, brandCount, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
             html += '</div>';
 
             return html;
@@ -268,17 +323,25 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
          * @param {string} startDate - Start date filter
          * @param {string} endDate - End date filter
          * @param {string} department - Department filter
+         * @param {string} brand1Id - Brand 1 ID
+         * @param {string} brand2Id - Brand 2 ID
+         * @param {string} brand3Id - Brand 3 ID
+         * @param {string} brand4Id - Brand 4 ID
          * @returns {string} HTML content
          */
-        function buildDetailView(class1, class2, class3, brand, scriptUrl, startDate, endDate, department) {
+        function buildDetailView(class1, class2, class3, brand, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var html = '';
             
-            // Back button with date params
+            // Back button with date params and brand params
             html += '<div class="back-button-container">';
             var backUrl = scriptUrl + '&loadData=T';
             if (startDate) backUrl += '&startdate=' + encodeURIComponent(startDate);
             if (endDate) backUrl += '&enddate=' + encodeURIComponent(endDate);
             if (department) backUrl += '&department=' + encodeURIComponent(department);
+            if (brand1Id) backUrl += '&brand1=' + encodeURIComponent(brand1Id);
+            if (brand2Id) backUrl += '&brand2=' + encodeURIComponent(brand2Id);
+            if (brand3Id) backUrl += '&brand3=' + encodeURIComponent(brand3Id);
+            if (brand4Id) backUrl += '&brand4=' + encodeURIComponent(brand4Id);
             html += '<a href="' + backUrl + '" class="back-button">← Back to Summary</a>';
             html += '</div>';
 
@@ -297,7 +360,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '</div>';
 
             // Get detail data
-            var detailData = getDetailData(class1, class2, class3, brand, startDate, endDate, department);
+            var detailData = getDetailData(class1, class2, class3, brand, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id);
 
             // Display record count
             html += '<div class="record-count">';
@@ -309,6 +372,14 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
 
             html += '<div class="search-section">';
             html += '<div class="search-box-container">';
+            html += '<div style="display:flex;align-items:center;gap:8px;">';
+            html += '<label for="selectedBrandFilter" style="font-weight:500;white-space:nowrap;">Selected Brand:</label>';
+            html += '<select id="selectedBrandFilter" onchange="filterDetailBySelectedBrand()" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;">';
+            html += '<option value="both">Both</option>';
+            html += '<option value="yes">Yes</option>';
+            html += '<option value="no">No</option>';
+            html += '</select>';
+            html += '</div>';
             html += '<input type="text" id="searchBox-detail" class="search-box" placeholder="Search this table..." onkeyup="filterTable(\'detail\')">';
             html += '<button type="button" class="export-btn" onclick="exportToExcel(\'detail\')">📥 Export to Excel</button>';
             html += '</div>';
@@ -326,11 +397,32 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
          * @param {string} department - Department filter
          * @returns {Object} Summary data with category totals
          */
-        function getSummaryData(startDate, endDate, department) {
+function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var results = [];
             var categoryTotals = {};
-
+            
             try {
+                // Get brand list and filter selected brands
+                var brandList = getBrandList();
+                var brandIds = [brand1Id, brand2Id, brand3Id, brand4Id].filter(function(id) { return id && id !== ''; });
+                log.debug('Brand IDs', 'brandIds: ' + JSON.stringify(brandIds));
+                
+                var selectedBrands = getBrandNames(brandList, brandIds);
+                log.debug('Selected Brands', 'selectedBrands: ' + JSON.stringify(selectedBrands));
+                
+                // Build dynamic brand CASE statements for amounts and quantities
+                var brandCases = '';
+                var brandQtyCases = '';
+                for (var i = 0; i < brandIds.length; i++) {
+                    brandCases += '    SUM(CASE WHEN i.custitem_bas_item_brand = ' + brandIds[i] + ' THEN tl.netAmount * -1 ELSE 0 END) AS brand' + i + '_amount, ';
+                    brandQtyCases += '    SUM(CASE WHEN i.custitem_bas_item_brand = ' + brandIds[i] + ' THEN tl.quantity * -1 ELSE 0 END) AS brand' + i + '_qty, ';
+                }
+                
+                // Build NOT IN clause for other brands
+                var otherBrandsCondition = brandIds.length > 0 
+                    ? 'i.custitem_bas_item_brand NOT IN (' + brandIds.join(', ') + ')' 
+                    : 'i.custitem_bas_item_brand IS NOT NULL';
+                
                 var sql = 
                     'SELECT ' +
                     '    CASE ' +
@@ -352,11 +444,10 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     '        THEN SUBSTR(REPLACE(i.custitem_ns_temp_prod, \'Built-In\', \'BuiltIn\'), INSTR(REPLACE(i.custitem_ns_temp_prod, \'Built-In\', \'BuiltIn\'), \'-\', 1, 2) + 1) ' +
                     '        ELSE NULL ' +
                     '    END AS class_3, ' +
-                    '    SUM(CASE WHEN i.custitem_bas_item_brand = 48 THEN tl.netAmount * -1 ELSE 0 END) AS profile_amount, ' +
-                    '    SUM(CASE WHEN i.custitem_bas_item_brand = 26 THEN tl.netAmount * -1 ELSE 0 END) AS ge_amount, ' +
-                    '    SUM(CASE WHEN i.custitem_bas_item_brand = 15 THEN tl.netAmount * -1 ELSE 0 END) AS cafe_amount, ' +
-                    '    SUM(CASE WHEN i.custitem_bas_item_brand = 43 THEN tl.netAmount * -1 ELSE 0 END) AS monogram_amount, ' +
-                    '    SUM(CASE WHEN i.custitem_bas_item_brand NOT IN (48, 26, 15, 43) THEN tl.netAmount * -1 ELSE 0 END) AS other_brands_amount, ' +
+                    brandCases +
+                    brandQtyCases +
+                    '    SUM(CASE WHEN ' + otherBrandsCondition + ' THEN tl.netAmount * -1 ELSE 0 END) AS other_brands_amount, ' +
+                    '    SUM(CASE WHEN ' + otherBrandsCondition + ' THEN tl.quantity * -1 ELSE 0 END) AS other_brands_qty, ' +
                     '    SUM(tl.netAmount * -1) AS total_amount, ' +
                     '    COUNT(DISTINCT t.id) AS transaction_count, ' +
                     '    SUM(tl.quantity * -1) AS line_count ' +
@@ -403,36 +494,45 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     // Initialize category totals if not exists
                     if (!categoryTotals[category]) {
                         categoryTotals[category] = {
-                            profileAmount: 0,
-                            geAmount: 0,
-                            cafeAmount: 0,
-                            monogramAmount: 0,
+                            brandAmounts: [],
                             otherBrandsAmount: 0,
                             totalAmount: 0
                         };
+                        // Initialize brand amounts array
+                        for (var b = 0; b < brandIds.length; b++) {
+                            categoryTotals[category].brandAmounts.push(0);
+                        }
                     }
                     
-                    // Accumulate category totals
-                    categoryTotals[category].profileAmount += parseFloat(row.profile_amount) || 0;
-                    categoryTotals[category].geAmount += parseFloat(row.ge_amount) || 0;
-                    categoryTotals[category].cafeAmount += parseFloat(row.cafe_amount) || 0;
-                    categoryTotals[category].monogramAmount += parseFloat(row.monogram_amount) || 0;
+                    // Accumulate category totals for each brand
+                    for (var b = 0; b < brandIds.length; b++) {
+                        var brandAmount = parseFloat(row['brand' + b + '_amount']) || 0;
+                        categoryTotals[category].brandAmounts[b] += brandAmount;
+                    }
                     categoryTotals[category].otherBrandsAmount += parseFloat(row.other_brands_amount) || 0;
                     categoryTotals[category].totalAmount += parseFloat(row.total_amount) || 0;
                     
-                    results.push({
+                    // Build result record with dynamic brand amounts and quantities
+                    var record = {
                         class1: category,
                         class2: row.class_2 || '-',
                         class3: row.class_3 || '-',
-                        profileAmount: parseFloat(row.profile_amount) || 0,
-                        geAmount: parseFloat(row.ge_amount) || 0,
-                        cafeAmount: parseFloat(row.cafe_amount) || 0,
-                        monogramAmount: parseFloat(row.monogram_amount) || 0,
+                        brandAmounts: [],
+                        brandQuantities: [],
                         otherBrandsAmount: parseFloat(row.other_brands_amount) || 0,
+                        otherBrandsQty: parseInt(row.other_brands_qty) || 0,
                         totalAmount: parseFloat(row.total_amount) || 0,
                         transactionCount: parseInt(row.transaction_count) || 0,
                         lineCount: parseInt(row.line_count) || 0
-                    });
+                    };
+                    
+                    // Add brand amounts and quantities to record
+                    for (var b = 0; b < brandIds.length; b++) {
+                        record.brandAmounts.push(parseFloat(row['brand' + b + '_amount']) || 0);
+                        record.brandQuantities.push(parseInt(row['brand' + b + '_qty']) || 0);
+                    }
+                    
+                    results.push(record);
                 }
 
             } catch (e) {
@@ -444,8 +544,105 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
 
             return {
                 records: results,
-                categoryTotals: categoryTotals
+                categoryTotals: categoryTotals,
+                selectedBrands: selectedBrands,
+                brandCount: brandIds.length
             };
+        }
+
+        /**
+         * Gets list of all brands from database
+         * @returns {Array} Array of brand objects with id, name, and parent_company
+         */
+        function getBrandList() {
+            try {
+                var sql = 
+                    'SELECT brand.id, brand.name, parent.name AS parent_company ' +
+                    'FROM customrecord_bas_brand_name_list brand ' +
+                    'LEFT JOIN customlist_bas_parent_company_list parent ' +
+                    '    ON parent.id = brand.custrecord_bas_parent_company ' +
+                    'ORDER BY brand.name';
+                
+                var resultSet = query.runSuiteQL({query: sql});
+                var brands = resultSet.asMappedResults();
+                
+                log.debug('Brand List Loaded', brands.length + ' brands found');
+                return brands;
+            } catch (e) {
+                log.error('Error loading brand list', {
+                    error: e.message,
+                    stack: e.stack
+                });
+                return [];
+            }
+        }
+
+        /**
+         * Gets brand names from brand IDs
+         * @param {Array} brandList - Full list of brands
+         * @param {Array} brandIds - Array of brand IDs to lookup
+         * @returns {Array} Array of brand name strings
+         */
+        function getBrandNames(brandList, brandIds) {
+            var names = [];
+            for (var i = 0; i < brandIds.length; i++) {
+                if (!brandIds[i]) {
+                    names.push(null);
+                    continue;
+                }
+                var brand = null;
+                for (var j = 0; j < brandList.length; j++) {
+                    // Compare as strings to handle type mismatches
+                    if (String(brandList[j].id) === String(brandIds[i])) {
+                        brand = brandList[j];
+                        break;
+                    }
+                }
+                names.push(brand ? brand.name : null);
+            }
+            return names;
+        }
+
+        /**
+         * Builds brand selector dropdowns
+         * @param {Array} brandList - List of all brands
+         * @param {string} brand1Id - Selected brand 1 ID
+         * @param {string} brand2Id - Selected brand 2 ID
+         * @param {string} brand3Id - Selected brand 3 ID
+         * @param {string} brand4Id - Selected brand 4 ID
+         * @returns {string} HTML for brand selector dropdowns
+         */
+        function buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id) {
+            var html = '';
+            
+            html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">';
+            
+            var brandIds = [brand1Id, brand2Id, brand3Id, brand4Id];
+            var labels = ['Brand 1:', 'Brand 2:', 'Brand 3:', 'Brand 4:'];
+            
+            for (var b = 0; b < 4; b++) {
+                html += '<div>';
+                html += '<label for="brand' + (b + 1) + '" style="display: block; margin-bottom: 5px; font-weight: 500;">' + labels[b] + '</label>';
+                html += '<select id="brand' + (b + 1) + '" name="brand' + (b + 1) + '" style="padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; width: 100%;">';
+                html += '<option value="">-- None --</option>';
+                
+                for (var i = 0; i < brandList.length; i++) {
+                    // Compare as strings to handle type mismatches
+                    var selected = String(brandList[i].id) === String(brandIds[b]) ? ' selected' : '';
+                    var displayName = escapeHtml(brandList[i].name);
+                    if (brandList[i].parent_company) {
+                        displayName += ' (' + escapeHtml(brandList[i].parent_company) + ')';
+                    }
+                    html += '<option value="' + escapeHtml(brandList[i].id) + '"' + selected + '>' + displayName + '</option>';
+                }
+                
+                html += '</select>';
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            
+            return html;
         }
 
         /**
@@ -457,11 +654,18 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
          * @param {string} startDate - Start date filter
          * @param {string} endDate - End date filter
          * @param {string} department - Department filter
+         * @param {string} brand1Id - Brand 1 ID
+         * @param {string} brand2Id - Brand 2 ID
+         * @param {string} brand3Id - Brand 3 ID
+         * @param {string} brand4Id - Brand 4 ID
          * @returns {Object} Detail data with count info
          */
-        function getDetailData(class1, class2, class3, brand, startDate, endDate, department) {
+        function getDetailData(class1, class2, class3, brand, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var results = [];
             var totalCount = 0;
+            
+            // Build list of selected brand IDs for comparison
+            var selectedBrandIds = [brand1Id, brand2Id, brand3Id, brand4Id].filter(function(id) { return id && id !== ''; });
 
             try {
                 // First, get the total count
@@ -541,6 +745,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     '        THEN SUBSTR(REPLACE(i.custitem_ns_temp_prod, \'Built-In\', \'BuiltIn\'), INSTR(REPLACE(i.custitem_ns_temp_prod, \'Built-In\', \'BuiltIn\'), \'-\', 1, 2) + 1) ' +
                     '        ELSE NULL ' +
                     '    END AS class_3, ' +
+                    '    i.custitem_bas_item_brand AS item_brand_id, ' +
                     '    brand.name AS item_brand_name, ' +
                     '    i.itemid AS item_number, ' +
                     '    dept.name AS department_name, ' +
@@ -608,6 +813,17 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
 
                 for (var i = 0; i < mappedResults.length; i++) {
                     var row = mappedResults[i];
+                    
+                    // Check if this item's brand is in the selected brands
+                    var itemBrandId = row.item_brand_id ? String(row.item_brand_id) : '';
+                    var isSelectedBrand = false;
+                    for (var b = 0; b < selectedBrandIds.length; b++) {
+                        if (String(selectedBrandIds[b]) === itemBrandId) {
+                            isSelectedBrand = true;
+                            break;
+                        }
+                    }
+                    
                     results.push({
                         class1: row.class_1 || '-',
                         class2: row.class_2 || '-',
@@ -625,7 +841,8 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                         geAmount: parseFloat(row.ge_amount) || 0,
                         cafeAmount: parseFloat(row.cafe_amount) || 0,
                         monogramAmount: parseFloat(row.monogram_amount) || 0,
-                        amount: parseFloat(row.amount) || 0
+                        amount: parseFloat(row.amount) || 0,
+                        isSelectedBrand: isSelectedBrand
                     });
                 }
 
@@ -647,106 +864,142 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
          * Builds the summary table
          * @param {Array} data - Summary data
          * @param {Object} categoryTotals - Category totals for percentage calculations
+         * @param {Array} selectedBrands - Array of selected brand names
+         * @param {number} brandCount - Number of selected brands
          * @param {string} scriptUrl - Suitelet URL
          * @param {string} startDate - Start date filter
          * @param {string} endDate - End date filter
          * @param {string} department - Department filter
+         * @param {string} brand1Id - Brand 1 ID
+         * @param {string} brand2Id - Brand 2 ID
+         * @param {string} brand3Id - Brand 3 ID
+         * @param {string} brand4Id - Brand 4 ID
          * @returns {string} HTML table
          */
-        function buildSummaryTable(data, categoryTotals, scriptUrl, startDate, endDate, department) {
+        function buildSummaryTable(data, categoryTotals, selectedBrands, brandCount, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id) {
             var html = '';
 
             html += '<div class="table-container">';
-            html += '<table class="data-table" id="table-summary">';
+            html += '<table class="data-table" id="table-summary" data-brand-count="' + brandCount + '">';
             html += '<thead>';
             html += '<tr>';
             html += '<th onclick="sortTable(\'summary\', 0)">Category</th>';
             html += '<th onclick="sortTable(\'summary\', 1)">Sub-Category</th>';
             html += '<th onclick="sortTable(\'summary\', 2)">Configuration</th>';
-            html += '<th onclick="sortTable(\'summary\', 3)">Profile</th>';
-            html += '<th onclick="sortTable(\'summary\', 4)">Profile %</th>';
-            html += '<th onclick="sortTable(\'summary\', 5)">GE</th>';
-            html += '<th onclick="sortTable(\'summary\', 6)">GE %</th>';
-            html += '<th onclick="sortTable(\'summary\', 7)">Cafe</th>';
-            html += '<th onclick="sortTable(\'summary\', 8)">Cafe %</th>';
-            html += '<th onclick="sortTable(\'summary\', 9)">Monogram</th>';
-            html += '<th onclick="sortTable(\'summary\', 10)">Monogram %</th>';
-            html += '<th onclick="sortTable(\'summary\', 11)">Selected Brands Total</th>';
-            html += '<th onclick="sortTable(\'summary\', 12)">Selected Brands %</th>';
-            html += '<th onclick="sortTable(\'summary\', 13)">All Other Brands Total</th>';
-            html += '<th onclick="sortTable(\'summary\', 14)">All Other Brands %</th>';
-            html += '<th onclick="sortTable(\'summary\', 15)">All Brands Total</th>';
-            html += '<th onclick="sortTable(\'summary\', 16)">All Brands %</th>';
-            html += '<th onclick="sortTable(\'summary\', 17)">QTY</th>';
+            
+            // Dynamic brand headers
+            var colIndex = 3;
+            for (var b = 0; b < selectedBrands.length; b++) {
+                html += '<th onclick="sortTable(\'summary\', ' + colIndex + ')">' + selectedBrands[b] + '</th>';
+                colIndex++;
+                html += '<th onclick="sortTable(\'summary\', ' + colIndex + ')">' + selectedBrands[b] + ' %</th>';
+                colIndex++;
+            }
+            
+            html += '<th onclick="sortTable(\'summary\', ' + colIndex + ')">Selected Brands Total</th>';
+            colIndex++;
+            html += '<th onclick="sortTable(\'summary\', ' + colIndex + ')">Selected Brands %</th>';
+            colIndex++;
+            html += '<th onclick="sortTable(\'summary\', ' + colIndex + ')">All Other Brands Total</th>';
+            colIndex++;
+            html += '<th onclick="sortTable(\'summary\', ' + colIndex + ')">All Other Brands %</th>';
+            colIndex++;
+            html += '<th onclick="sortTable(\'summary\', ' + colIndex + ')">All Brands Total</th>';
+            colIndex++;
+            html += '<th onclick="sortTable(\'summary\', ' + colIndex + ')">All Brands %</th>';
+            colIndex++;
+            html += '<th onclick="sortTable(\'summary\', ' + colIndex + ')">QTY</th>';
             html += '</tr>';
             html += '</thead>';
             html += '<tbody>';
 
             // Initialize totals
             var totals = {
-                profileAmount: 0,
-                geAmount: 0,
-                cafeAmount: 0,
-                monogramAmount: 0,
+                brandAmounts: [],
+                brandQuantities: [],
                 selectedBrandsTotal: 0,
+                selectedBrandsQty: 0,
                 otherBrandsAmount: 0,
+                otherBrandsQty: 0,
                 totalAmount: 0,
                 transactionCount: 0,
                 lineCount: 0
             };
+            for (var b = 0; b < brandCount; b++) {
+                totals.brandAmounts.push(0);
+                totals.brandQuantities.push(0);
+            }
 
             for (var i = 0; i < data.length; i++) {
                 var row = data[i];
                 var rowClass = (i % 2 === 0) ? 'even-row' : 'odd-row';
 
                 // Calculate selected brands total for this row
-                var selectedBrandsTotal = row.profileAmount + row.geAmount + row.cafeAmount + row.monogramAmount;
+                var selectedBrandsTotal = 0;
+                var selectedBrandsQty = 0;
+                for (var b = 0; b < row.brandAmounts.length; b++) {
+                    selectedBrandsTotal += row.brandAmounts[b];
+                    selectedBrandsQty += row.brandQuantities[b];
+                    totals.brandAmounts[b] += row.brandAmounts[b];
+                    totals.brandQuantities[b] += row.brandQuantities[b];
+                }
                 
                 // Accumulate totals
-                totals.profileAmount += row.profileAmount;
-                totals.geAmount += row.geAmount;
-                totals.cafeAmount += row.cafeAmount;
-                totals.monogramAmount += row.monogramAmount;
                 totals.selectedBrandsTotal += selectedBrandsTotal;
+                totals.selectedBrandsQty += selectedBrandsQty;
                 totals.otherBrandsAmount += row.otherBrandsAmount;
+                totals.otherBrandsQty += row.otherBrandsQty;
                 totals.totalAmount += row.totalAmount;
                 totals.transactionCount += row.transactionCount;
                 totals.lineCount += row.lineCount;
 
-                // Build drill-down URL
-                var drillUrl = scriptUrl + '&loadData=T&view=detail';
-                drillUrl += '&class1=' + encodeURIComponent(row.class1);
-                drillUrl += '&class2=' + encodeURIComponent(row.class2);
-                drillUrl += '&class3=' + encodeURIComponent(row.class3);
-                if (startDate) drillUrl += '&startdate=' + encodeURIComponent(startDate);
-                if (endDate) drillUrl += '&enddate=' + encodeURIComponent(endDate);
-                if (department) drillUrl += '&department=' + encodeURIComponent(department);
+                // Build drill-down URLs for different classification levels
+                var baseUrl = scriptUrl + '&loadData=T&view=detail';
+                var dateParams = '';
+                if (startDate) dateParams += '&startdate=' + encodeURIComponent(startDate);
+                if (endDate) dateParams += '&enddate=' + encodeURIComponent(endDate);
+                if (department) dateParams += '&department=' + encodeURIComponent(department);
+                var brandParams = '';
+                if (brand1Id) brandParams += '&brand1=' + encodeURIComponent(brand1Id);
+                if (brand2Id) brandParams += '&brand2=' + encodeURIComponent(brand2Id);
+                if (brand3Id) brandParams += '&brand3=' + encodeURIComponent(brand3Id);
+                if (brand4Id) brandParams += '&brand4=' + encodeURIComponent(brand4Id);
+                
+                // URL with only Category
+                var class1Url = baseUrl + '&class1=' + encodeURIComponent(row.class1) + dateParams + brandParams;
+                
+                // URL with Category + Sub-Category
+                var class2Url = baseUrl + '&class1=' + encodeURIComponent(row.class1) + '&class2=' + encodeURIComponent(row.class2) + dateParams + brandParams;
+                
+                // URL with all three (Category + Sub-Category + Configuration)
+                var drillUrl = baseUrl + '&class1=' + encodeURIComponent(row.class1) + '&class2=' + encodeURIComponent(row.class2) + '&class3=' + encodeURIComponent(row.class3) + dateParams + brandParams;
 
                 // Calculate percentages for this row
-                var catTotal = categoryTotals[row.class1] || {profileAmount: 0, geAmount: 0, hotpointAmount: 0, cafeAmount: 0, monogramAmount: 0};
-                var profilePct = catTotal.profileAmount > 0 ? (row.profileAmount / catTotal.profileAmount * 100).toFixed(2) : '0.00';
-                var gePct = catTotal.geAmount > 0 ? (row.geAmount / catTotal.geAmount * 100).toFixed(2) : '0.00';
-                var cafePct = catTotal.cafeAmount > 0 ? (row.cafeAmount / catTotal.cafeAmount * 100).toFixed(2) : '0.00';
-                var monogramPct = catTotal.monogramAmount > 0 ? (row.monogramAmount / catTotal.monogramAmount * 100).toFixed(2) : '0.00';
+                var catTotal = categoryTotals[row.class1] || {brandAmounts: [], otherBrandsAmount: 0, totalAmount: 0};
+                
+                html += '<tr class="' + rowClass + ' clickable-row" onclick="window.location.href=\'' + drillUrl + '\'">';
+                html += '<td class="class-cell" onclick="event.stopPropagation(); window.location.href=\'' + class1Url + '\'" title="Click to view all ' + escapeHtml(formatDisplayText(row.class1)) + ' items">' + escapeHtml(formatDisplayText(row.class1)) + '</td>';
+                html += '<td class="class-cell" onclick="event.stopPropagation(); window.location.href=\'' + class2Url + '\'" title="Click to view ' + escapeHtml(formatDisplayText(row.class1)) + ' > ' + escapeHtml(formatDisplayText(row.class2)) + ' items">' + escapeHtml(formatDisplayText(row.class2)) + '</td>';
+                html += '<td class="class-cell" onclick="event.stopPropagation(); window.location.href=\'' + drillUrl + '\'" title="Click to view ' + escapeHtml(formatDisplayText(row.class1)) + ' > ' + escapeHtml(formatDisplayText(row.class2)) + ' > ' + escapeHtml(formatDisplayText(row.class3)) + ' items">' + escapeHtml(formatDisplayText(row.class3)) + '</td>';
+                
+                // Dynamic brand columns
+                for (var b = 0; b < row.brandAmounts.length; b++) {
+                    var brandAmount = row.brandAmounts[b];
+                    var brandQty = row.brandQuantities[b];
+                    var catBrandTotal = catTotal.brandAmounts && catTotal.brandAmounts[b] ? catTotal.brandAmounts[b] : 0;
+                    var brandPct = catBrandTotal > 0 ? (brandAmount / catBrandTotal * 100).toFixed(2) : '0.00';
+                    
+                    html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);" title="Quantity: ' + brandQty + '">' + formatCurrency(brandAmount) + '</td>';
+                    html += '<td class="amount percent">' + brandPct + '%</td>';
+                }
+                
                 var selectedBrandsPct = catTotal.totalAmount > 0 ? (selectedBrandsTotal / catTotal.totalAmount * 100).toFixed(2) : '0.00';
                 var otherBrandsPct = catTotal.otherBrandsAmount > 0 ? (row.otherBrandsAmount / catTotal.otherBrandsAmount * 100).toFixed(2) : '0.00';
                 var allBrandsPct = catTotal.totalAmount > 0 ? (row.totalAmount / catTotal.totalAmount * 100).toFixed(2) : '0.00';
 
-                html += '<tr class="' + rowClass + ' clickable-row" onclick="window.location.href=\'' + drillUrl + '\'">';
-                html += '<td>' + escapeHtml(formatDisplayText(row.class1)) + '</td>';
-                html += '<td>' + escapeHtml(formatDisplayText(row.class2)) + '</td>';
-                html += '<td>' + escapeHtml(formatDisplayText(row.class3)) + '</td>';
-                html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);">' + formatCurrency(row.profileAmount) + '</td>';
-                html += '<td class="amount percent">' + profilePct + '%</td>';
-                html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);">' + formatCurrency(row.geAmount) + '</td>';
-                html += '<td class="amount percent">' + gePct + '%</td>';
-                html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);">' + formatCurrency(row.cafeAmount) + '</td>';
-                html += '<td class="amount percent">' + cafePct + '%</td>';
-                html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);">' + formatCurrency(row.monogramAmount) + '</td>';
-                html += '<td class="amount percent">' + monogramPct + '%</td>';
-                html += '<td class="amount total-amount">' + formatCurrency(selectedBrandsTotal) + '</td>';
+                html += '<td class="amount total-amount" title="Quantity: ' + selectedBrandsQty + '">' + formatCurrency(selectedBrandsTotal) + '</td>';
                 html += '<td class="amount percent">' + selectedBrandsPct + '%</td>';
-                html += '<td class="amount total-amount">' + formatCurrency(row.otherBrandsAmount) + '</td>';
+                html += '<td class="amount total-amount" title="Quantity: ' + row.otherBrandsQty + '">' + formatCurrency(row.otherBrandsAmount) + '</td>';
                 html += '<td class="amount percent">' + otherBrandsPct + '%</td>';
                 html += '<td class="amount total-amount">' + formatCurrency(row.totalAmount) + '</td>';
                 html += '<td class="amount percent">' + allBrandsPct + '%</td>';
@@ -759,17 +1012,16 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '<td></td>'; // Empty cell for Category column
             html += '<td></td>'; // Empty cell for Sub-Category column
             html += '<td style="text-align: right; font-weight: bold;">Total:</td>';
-            html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);">' + formatCurrency(totals.profileAmount) + '</td>';
-            html += '<td></td>'; // Empty cell for Profile %
-            html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);">' + formatCurrency(totals.geAmount) + '</td>';
-            html += '<td></td>'; // Empty cell for GE %
-            html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);">' + formatCurrency(totals.cafeAmount) + '</td>';
-            html += '<td></td>'; // Empty cell for Cafe %
-            html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);">' + formatCurrency(totals.monogramAmount) + '</td>';
-            html += '<td></td>'; // Empty cell for Monogram %
-            html += '<td class="amount total-amount">' + formatCurrency(totals.selectedBrandsTotal) + '</td>';
+            
+            // Dynamic brand totals
+            for (var b = 0; b < totals.brandAmounts.length; b++) {
+                html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);" title="Quantity: ' + totals.brandQuantities[b] + '">' + formatCurrency(totals.brandAmounts[b]) + '</td>';
+                html += '<td></td>'; // Empty cell for brand %
+            }
+            
+            html += '<td class="amount total-amount" title="Quantity: ' + totals.selectedBrandsQty + '">' + formatCurrency(totals.selectedBrandsTotal) + '</td>';
             html += '<td></td>'; // Empty cell for Selected Brands %
-            html += '<td class="amount total-amount">' + formatCurrency(totals.otherBrandsAmount) + '</td>';
+            html += '<td class="amount total-amount" title="Quantity: ' + totals.otherBrandsQty + '">' + formatCurrency(totals.otherBrandsAmount) + '</td>';
             html += '<td></td>'; // Empty cell for All Other Brands %
             html += '<td class="amount total-amount">' + formatCurrency(totals.totalAmount) + '</td>';
             html += '<td></td>'; // Empty cell for All Brands %
@@ -799,15 +1051,16 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '<th onclick="sortTable(\'detail\', 0)">Category</th>';
             html += '<th onclick="sortTable(\'detail\', 1)">Sub-Category</th>';
             html += '<th onclick="sortTable(\'detail\', 2)">Config</th>';
-            html += '<th onclick="sortTable(\'detail\', 3)">Brand</th>';
-            html += '<th onclick="sortTable(\'detail\', 4)">Item #</th>';
-            html += '<th onclick="sortTable(\'detail\', 5)">Department</th>';
-            html += '<th onclick="sortTable(\'detail\', 6)">Transaction #</th>';
-            html += '<th onclick="sortTable(\'detail\', 7)">Date</th>';
-            html += '<th onclick="sortTable(\'detail\', 8)">Customer</th>';
-            html += '<th onclick="sortTable(\'detail\', 9)">Qty</th>';
-            html += '<th onclick="sortTable(\'detail\', 10)">Rate</th>';
-            html += '<th onclick="sortTable(\'detail\', 11)">Amount</th>';
+            html += '<th onclick="sortTable(\'detail\', 3)">Selected Brand</th>';
+            html += '<th onclick="sortTable(\'detail\', 4)">Brand</th>';
+            html += '<th onclick="sortTable(\'detail\', 5)">Item #</th>';
+            html += '<th onclick="sortTable(\'detail\', 6)">Selling Location</th>';
+            html += '<th onclick="sortTable(\'detail\', 7)">Transaction #</th>';
+            html += '<th onclick="sortTable(\'detail\', 8)">Date</th>';
+            html += '<th onclick="sortTable(\'detail\', 9)">Customer</th>';
+            html += '<th onclick="sortTable(\'detail\', 10)">Qty</th>';
+            html += '<th onclick="sortTable(\'detail\', 11)">Rate</th>';
+            html += '<th onclick="sortTable(\'detail\', 12)">Amount</th>';
             html += '</tr>';
             html += '</thead>';
             html += '<tbody>';
@@ -826,10 +1079,11 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 totals.quantity += row.quantity;
                 totals.amount += row.amount;
 
-                html += '<tr class="' + rowClass + '">';
+                html += '<tr class="' + rowClass + '" data-selected-brand="' + (row.isSelectedBrand ? 'yes' : 'no') + '">';
                 html += '<td>' + escapeHtml(formatDisplayText(row.class1)) + '</td>';
                 html += '<td>' + escapeHtml(formatDisplayText(row.class2)) + '</td>';
                 html += '<td>' + escapeHtml(formatDisplayText(row.class3)) + '</td>';
+                html += '<td class="center" style="' + (row.isSelectedBrand ? 'font-weight:bold;color:#2E7D32;' : 'color:#666;') + '">' + (row.isSelectedBrand ? 'Yes' : 'No') + '</td>';
                 html += '<td>' + escapeHtml(row.brand) + '</td>';
                 html += '<td>' + escapeHtml(row.itemNumber) + '</td>';
                 html += '<td>' + escapeHtml(row.department) + '</td>';
@@ -844,7 +1098,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
 
             // Add summary row
             html += '<tr class="summary-row">';
-            html += '<td colspan="9" style="text-align: right; font-weight: bold;">Total:</td>';
+            html += '<td colspan="10" style="text-align: right; font-weight: bold;">Total:</td>';
             html += '<td class="amount">' + totals.quantity.toFixed(2) + '</td>';
             html += '<td class="amount"></td>'; // Empty Rate column
             html += '<td class="amount total-amount" data-value="' + totals.amount + '">' + formatCurrency(totals.amount, true) + '</td>';
@@ -976,12 +1230,14 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 '.table-container { overflow: visible; }' +
                 '' +
                 '/* Data table styles */' +
-                'table.data-table { border-collapse: separate; border-spacing: 0; width: 100%; margin: 0; border-left: 1px solid #ddd; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd; background: white; }' +
-                'table.data-table thead th { position: -webkit-sticky; position: sticky; top: 0; z-index: 101; background-color: #f8f9fa; border: 1px solid #ddd; border-top: none; padding: 10px 8px; text-align: left; vertical-align: top; font-weight: bold; color: #333; font-size: 12px; cursor: pointer; user-select: none; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }' +
+                'table.data-table { border-collapse: separate; border-spacing: 0; width: 100%; margin: 0; border: 1px solid #ddd; background: white; }' +
+                'table.data-table thead th { position: -webkit-sticky; position: sticky; top: 0; z-index: 101; background-color: #f8f9fa; border: 1px solid #ddd; padding: 10px 8px; text-align: left; vertical-align: top; font-weight: bold; color: #333; font-size: 12px; cursor: pointer; user-select: none; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }' +
                 'table.data-table thead th:hover { background-color: #e9ecef; }' +
                 'table.data-table th, table.data-table td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; color: #000; }' +
                 'table.data-table tbody tr:nth-child(even) td { background-color: #f9f9f9; }' +
-                'table.data-table tbody tr:hover td { background-color: #e8f4f8; }' +
+                'table.data-table tbody tr:hover td { background-color: #fffae6 !important; }' +
+                'table.data-table td.class-cell { cursor: pointer; position: relative; }' +
+                'table.data-table td.class-cell:hover { background-color: #ffd700 !important; font-weight: 500; }' +
                 'table.data-table a { color: #0c5460; text-decoration: none; }' +
                 'table.data-table a:hover { text-decoration: underline; }' +
                 'table.data-table td.amount { text-align: right !important; white-space: nowrap; }' +
@@ -1011,12 +1267,20 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 '    var startDate = document.getElementById("startdate").value;' +
                 '    var endDate = document.getElementById("enddate").value;' +
                 '    var department = document.getElementById("department").value;' +
+                '    var brand1 = document.getElementById("brand1").value;' +
+                '    var brand2 = document.getElementById("brand2").value;' +
+                '    var brand3 = document.getElementById("brand3").value;' +
+                '    var brand4 = document.getElementById("brand4").value;' +
                 '    var overlay = document.getElementById("loadingOverlay");' +
                 '    if (overlay) overlay.style.display = "flex";' +
                 '    var url = "' + scriptUrl + '&loadData=T";' +
                 '    if (startDate) url += "&startdate=" + encodeURIComponent(startDate);' +
                 '    if (endDate) url += "&enddate=" + encodeURIComponent(endDate);' +
                 '    if (department) url += "&department=" + encodeURIComponent(department);' +
+                '    url += "&brand1=" + encodeURIComponent(brand1);' +
+                '    url += "&brand2=" + encodeURIComponent(brand2);' +
+                '    url += "&brand3=" + encodeURIComponent(brand3);' +
+                '    url += "&brand4=" + encodeURIComponent(brand4);' +
                 '    window.location.href = url;' +
                 '}' +
                 '' +
@@ -1025,17 +1289,24 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 '    window.location.href = "' + scriptUrl + '";' +
                 '}' +
                 '' +
+                '/* Filter detail table by Selected Brand */' +
+                'function filterDetailBySelectedBrand() {' +
+                '    filterTable("detail");' +
+                '}' +
+                '' +
                 '/* Filter table */' +
                 'function filterTable(sectionId) {' +
                 '    var categoryInput = document.getElementById(\'searchCategory-\' + sectionId);' +
                 '    var subCategoryInput = document.getElementById(\'searchSubCategory-\' + sectionId);' +
                 '    var configurationInput = document.getElementById(\'searchConfiguration-\' + sectionId);' +
                 '    var generalSearchInput = document.getElementById(\'searchBox-\' + sectionId);' +
+                '    var selectedBrandFilter = document.getElementById(\'selectedBrandFilter\');' +
                 '    ' +
                 '    var categoryFilter = categoryInput ? categoryInput.value.toUpperCase() : \'\';' +
                 '    var subCategoryFilter = subCategoryInput ? subCategoryInput.value.toUpperCase() : \'\';' +
                 '    var configurationFilter = configurationInput ? configurationInput.value.toUpperCase() : \'\';' +
                 '    var generalFilter = generalSearchInput ? generalSearchInput.value.toUpperCase() : \'\';' +
+                '    var brandFilter = selectedBrandFilter ? selectedBrandFilter.value : \'both\';' +
                 '    ' +
                 '    var tbody = document.querySelector(\'#table-\' + sectionId + \' tbody\');' +
                 '    var rows = tbody.querySelectorAll(\'tr\');' +
@@ -1050,14 +1321,10 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 '            continue;' +
                 '        }' +
                 '        ' +
+                '        var textMatch = true;' +
                 '        if (generalFilter) {' +
                 '            var text = (row.textContent || row.innerText).toUpperCase();' +
-                '            if (text.indexOf(generalFilter) > -1) {' +
-                '                row.style.display = \'\';' +
-                '                visibleCount++;' +
-                '            } else {' +
-                '                row.style.display = \'none\';' +
-                '            }' +
+                '            textMatch = text.indexOf(generalFilter) > -1;' +
                 '        } else {' +
                 '            var categoryText = (cells[0].textContent || cells[0].innerText).toUpperCase();' +
                 '            var subCategoryText = (cells[1].textContent || cells[1].innerText).toUpperCase();' +
@@ -1067,17 +1334,25 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 '            var subCategoryMatch = !subCategoryFilter || subCategoryText.indexOf(subCategoryFilter) > -1;' +
                 '            var configurationMatch = !configurationFilter || configurationText.indexOf(configurationFilter) > -1;' +
                 '            ' +
-                '            if (categoryMatch && subCategoryMatch && configurationMatch) {' +
-                '                row.style.display = \'\';' +
-                '                visibleCount++;' +
-                '            } else {' +
-                '                row.style.display = \'none\';' +
-                '            }' +
+                '            textMatch = categoryMatch && subCategoryMatch && configurationMatch;' +
+                '        }' +
+                '        ' +
+                '        var brandMatch = true;' +
+                '        if (sectionId === \'detail\' && brandFilter !== \'both\') {' +
+                '            var selectedBrand = row.getAttribute(\'data-selected-brand\');' +
+                '            brandMatch = selectedBrand === brandFilter;' +
+                '        }' +
+                '        ' +
+                '        if (textMatch && brandMatch) {' +
+                '            row.style.display = \'\';' +
+                '            visibleCount++;' +
+                '        } else {' +
+                '            row.style.display = \'none\';' +
                 '        }' +
                 '    }' +
                 '    ' +
                 '    var countSpan = document.getElementById(\'searchCount-\' + sectionId);' +
-                '    if (categoryFilter || subCategoryFilter || configurationFilter || generalFilter) {' +
+                '    if (categoryFilter || subCategoryFilter || configurationFilter || generalFilter || (brandFilter && brandFilter !== \'both\')) {' +
                 '        countSpan.textContent = \'Showing \' + visibleCount + \' of \' + rows.length + \' results\';' +
                 '        countSpan.style.display = \'inline\';' +
                 '    } else {' +
@@ -1202,6 +1477,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 'function recalculatePercentages(sectionId) {' +
                 '    var table = document.getElementById(\'table-\' + sectionId);' +
                 '    if (!table) return;' +
+                '    var brandCount = parseInt(table.getAttribute(\'data-brand-count\')) || 4;' +
                 '    var tbody = table.querySelector(\'tbody\');' +
                 '    var rows = tbody.querySelectorAll(\'tr:not(.summary-row)\');' +
                 '    var categoryTotals = {};' +
@@ -1210,19 +1486,25 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 '        if (row.style.display === \'none\') continue;' +
                 '        var cells = row.cells;' +
                 '        var category = cells[0].textContent.trim();' +
-                '        var profileAmount = parseFloat(cells[3].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var geAmount = parseFloat(cells[5].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var cafeAmount = parseFloat(cells[7].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var monogramAmount = parseFloat(cells[9].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var otherBrandsAmount = parseFloat(cells[13].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var allBrandsAmount = parseFloat(cells[15].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
                 '        if (!categoryTotals[category]) {' +
-                '            categoryTotals[category] = {profileAmount: 0, geAmount: 0, cafeAmount: 0, monogramAmount: 0, otherBrandsAmount: 0, allBrandsAmount: 0};' +
+                '            categoryTotals[category] = {brandAmounts: [], selectedBrandsTotal: 0, otherBrandsAmount: 0, allBrandsAmount: 0};' +
+                '            for (var b = 0; b < brandCount; b++) {' +
+                '                categoryTotals[category].brandAmounts.push(0);' +
+                '            }' +
                 '        }' +
-                '        categoryTotals[category].profileAmount += profileAmount;' +
-                '        categoryTotals[category].geAmount += geAmount;' +
-                '        categoryTotals[category].cafeAmount += cafeAmount;' +
-                '        categoryTotals[category].monogramAmount += monogramAmount;' +
+                '        var cellIndex = 3;' +
+                '        var rowSelectedBrandsTotal = 0;' +
+                '        for (var b = 0; b < brandCount; b++) {' +
+                '            var brandAmount = parseFloat(cells[cellIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
+                '            categoryTotals[category].brandAmounts[b] += brandAmount;' +
+                '            rowSelectedBrandsTotal += brandAmount;' +
+                '            cellIndex += 2;' +
+                '        }' +
+                '        categoryTotals[category].selectedBrandsTotal += rowSelectedBrandsTotal;' +
+                '        var otherBrandsIndex = 3 + (brandCount * 2) + 2;' +
+                '        var allBrandsIndex = 3 + (brandCount * 2) + 4;' +
+                '        var otherBrandsAmount = parseFloat(cells[otherBrandsIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
+                '        var allBrandsAmount = parseFloat(cells[allBrandsIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
                 '        categoryTotals[category].otherBrandsAmount += otherBrandsAmount;' +
                 '        categoryTotals[category].allBrandsAmount += allBrandsAmount;' +
                 '    }' +
@@ -1233,27 +1515,29 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 '        var category = cells[0].textContent.trim();' +
                 '        var catTotal = categoryTotals[category];' +
                 '        if (!catTotal) continue;' +
-                '        var profileAmount = parseFloat(cells[3].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var geAmount = parseFloat(cells[5].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var cafeAmount = parseFloat(cells[7].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var monogramAmount = parseFloat(cells[9].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var selectedBrandsTotal = profileAmount + geAmount + cafeAmount + monogramAmount;' +
-                '        var otherBrandsAmount = parseFloat(cells[13].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var allBrandsAmount = parseFloat(cells[15].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var profilePct = catTotal.profileAmount > 0 ? (profileAmount / catTotal.profileAmount * 100).toFixed(2) : \'0.00\';' +
-                '        var gePct = catTotal.geAmount > 0 ? (geAmount / catTotal.geAmount * 100).toFixed(2) : \'0.00\';' +
-                '        var cafePct = catTotal.cafeAmount > 0 ? (cafeAmount / catTotal.cafeAmount * 100).toFixed(2) : \'0.00\';' +
-                '        var monogramPct = catTotal.monogramAmount > 0 ? (monogramAmount / catTotal.monogramAmount * 100).toFixed(2) : \'0.00\';' +
-                '        var selectedBrandsPct = catTotal.allBrandsAmount > 0 ? (selectedBrandsTotal / catTotal.allBrandsAmount * 100).toFixed(2) : \'0.00\';' +
+                '        var cellIndex = 3;' +
+                '        var selectedBrandsTotal = 0;' +
+                '        for (var b = 0; b < brandCount; b++) {' +
+                '            var brandAmount = parseFloat(cells[cellIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
+                '            selectedBrandsTotal += brandAmount;' +
+                '            var brandPct = catTotal.brandAmounts[b] > 0 ? (brandAmount / catTotal.brandAmounts[b] * 100).toFixed(2) : \'0.00\';' +
+                '            cells[cellIndex + 1].textContent = brandPct + \'%\';' +
+                '            cellIndex += 2;' +
+                '        }' +
+                '        var selectedBrandsTotalIndex = 3 + (brandCount * 2);' +
+                '        var selectedBrandsPctIndex = selectedBrandsTotalIndex + 1;' +
+                '        var otherBrandsIndex = selectedBrandsTotalIndex + 2;' +
+                '        var otherBrandsPctIndex = otherBrandsIndex + 1;' +
+                '        var allBrandsIndex = otherBrandsIndex + 2;' +
+                '        var allBrandsPctIndex = allBrandsIndex + 1;' +
+                '        var otherBrandsAmount = parseFloat(cells[otherBrandsIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
+                '        var allBrandsAmount = parseFloat(cells[allBrandsIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
+                '        var selectedBrandsPct = catTotal.selectedBrandsTotal > 0 ? (selectedBrandsTotal / catTotal.selectedBrandsTotal * 100).toFixed(2) : \'0.00\';' +
                 '        var otherBrandsPct = catTotal.otherBrandsAmount > 0 ? (otherBrandsAmount / catTotal.otherBrandsAmount * 100).toFixed(2) : \'0.00\';' +
                 '        var allBrandsPct = catTotal.allBrandsAmount > 0 ? (allBrandsAmount / catTotal.allBrandsAmount * 100).toFixed(2) : \'0.00\';' +
-                '        cells[4].textContent = profilePct + \'%\';' +
-                '        cells[6].textContent = gePct + \'%\';' +
-                '        cells[8].textContent = cafePct + \'%\';' +
-                '        cells[10].textContent = monogramPct + \'%\';' +
-                '        cells[12].textContent = selectedBrandsPct + \'%\';' +
-                '        cells[14].textContent = otherBrandsPct + \'%\';' +
-                '        cells[16].textContent = allBrandsPct + \'%\';' +
+                '        cells[selectedBrandsPctIndex].textContent = selectedBrandsPct + \'%\';' +
+                '        cells[otherBrandsPctIndex].textContent = otherBrandsPct + \'%\';' +
+                '        cells[allBrandsPctIndex].textContent = allBrandsPct + \'%\';' +
                 '    }' +
                 '    alert(\'Percentages recalculated based on \' + Object.keys(categoryTotals).length + \' visible categor(ies)!\');' +
                 '}';
