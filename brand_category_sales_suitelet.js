@@ -303,7 +303,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '<input type="text" id="searchSubCategory-summary" class="search-box" placeholder="Search Sub-Category..." onkeyup="filterTable(\'summary\')" style="flex:1;">';
             html += '<input type="text" id="searchConfiguration-summary" class="search-box" placeholder="Search Configuration..." onkeyup="filterTable(\'summary\')" style="flex:1;">';
             html += '<button type="button" class="clear-btn" onclick="clearSearchAndRecalc(\'summary\')" title="Clear all filters and recalculate percentages">Clear</button>';
-            html += '<button type="button" class="filter-btn" onclick="recalculatePercentages(\'summary\')" title="Recalculate percentages based on visible rows only">🔄 Recalc %</button>';
+            html += '<button type="button" class="filter-btn" onclick="recalculatePercentages(\'summary\')" title="Recalculate percentages based on visible rows only">🔄 Recalc</button>';
             html += '<button type="button" class="export-btn" onclick="exportToExcel(\'summary\')">📥 Export to Excel</button>';
             html += '</div>';
             html += '<span class="search-results-count" id="searchCount-summary"></span>';
@@ -979,8 +979,8 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 
                 html += '<tr class="' + rowClass + ' clickable-row" onclick="window.location.href=\'' + drillUrl + '\'">';
                 html += '<td class="class-cell" onclick="event.stopPropagation(); window.location.href=\'' + class1Url + '\'" title="Click to view all ' + escapeHtml(formatDisplayText(row.class1)) + ' items">' + escapeHtml(formatDisplayText(row.class1)) + '</td>';
-                html += '<td class="class-cell" onclick="event.stopPropagation(); window.location.href=\'' + class2Url + '\'" title="Click to view ' + escapeHtml(formatDisplayText(row.class1)) + ' > ' + escapeHtml(formatDisplayText(row.class2)) + ' items">' + escapeHtml(formatDisplayText(row.class2)) + '</td>';
-                html += '<td class="class-cell" onclick="event.stopPropagation(); window.location.href=\'' + drillUrl + '\'" title="Click to view ' + escapeHtml(formatDisplayText(row.class1)) + ' > ' + escapeHtml(formatDisplayText(row.class2)) + ' > ' + escapeHtml(formatDisplayText(row.class3)) + ' items">' + escapeHtml(formatDisplayText(row.class3)) + '</td>';
+                html += '<td class="class-cell" onmouseover="highlightClassificationCells(this.parentNode, 1)" onmouseout="clearClassificationHighlight(this.parentNode)" onclick="event.stopPropagation(); window.location.href=\'' + class2Url + '\'" title="Click to view ' + escapeHtml(formatDisplayText(row.class1)) + ' > ' + escapeHtml(formatDisplayText(row.class2)) + ' items">' + escapeHtml(formatDisplayText(row.class2)) + '</td>';
+                html += '<td class="class-cell" onmouseover="highlightClassificationCells(this.parentNode, 2)" onmouseout="clearClassificationHighlight(this.parentNode)" onclick="event.stopPropagation(); window.location.href=\'' + drillUrl + '\'" title="Click to view ' + escapeHtml(formatDisplayText(row.class1)) + ' > ' + escapeHtml(formatDisplayText(row.class2)) + ' > ' + escapeHtml(formatDisplayText(row.class3)) + ' items">' + escapeHtml(formatDisplayText(row.class3)) + '</td>';
                 
                 // Dynamic brand columns
                 for (var b = 0; b < row.brandAmounts.length; b++) {
@@ -1238,6 +1238,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 'table.data-table tbody tr:hover td { background-color: #fffae6 !important; }' +
                 'table.data-table td.class-cell { cursor: pointer; position: relative; }' +
                 'table.data-table td.class-cell:hover { background-color: #ffd700 !important; font-weight: 500; }' +
+                'table.data-table td.class-cell.hierarchy-hover { background-color: #ffd700 !important; font-weight: 500; }' +
                 'table.data-table a { color: #0c5460; text-decoration: none; }' +
                 'table.data-table a:hover { text-decoration: underline; }' +
                 'table.data-table td.amount { text-align: right !important; white-space: nowrap; }' +
@@ -1250,7 +1251,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '.clickable-row:hover td { background-color: #e3f2fd !important; }' +
                 '' +
                 '/* Summary row */' +
-                '.summary-row { background-color: #f0f0f0 !important; border-top: 2px solid #333 !important; font-weight: bold; }' +
+                '.summary-row { background-color: #f0f0f0 !important; border-top: 2px solid #333 !important; font-weight: bold; position: sticky; bottom: 0; z-index: 100; box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1); }' +
                 '.summary-row td { background-color: #f0f0f0 !important; font-weight: bold; }' +
                 '.summary-row:hover td { background-color: #e0e0e0 !important; }';
         }
@@ -1262,6 +1263,14 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
          */
         function getJavaScript(scriptUrl) {
             return '' +
+                '/* Format currency value */' +
+                'function formatCurrency(value) {' +
+                '    if (!value && value !== 0) return \'$0.00\';' +
+                '    var absValue = Math.abs(value);' +
+                '    var formatted = \'$\' + absValue.toFixed(2).replace(/\\d(?=(\\d{3})+\\.)/g, \'$&,\');' +
+                '    return formatted;' +
+                '}' +
+                '' +
                 '/* Apply date filter */' +
                 'function applyDateFilter() {' +
                 '    var startDate = document.getElementById("startdate").value;' +
@@ -1309,7 +1318,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    var brandFilter = selectedBrandFilter ? selectedBrandFilter.value : \'both\';' +
                 '    ' +
                 '    var tbody = document.querySelector(\'#table-\' + sectionId + \' tbody\');' +
-                '    var rows = tbody.querySelectorAll(\'tr\');' +
+                '    var rows = tbody.querySelectorAll(\'tr:not(.summary-row)\');' +
                 '    var visibleCount = 0;' +
                 '    ' +
                 '    for (var i = 0; i < rows.length; i++) {' +
@@ -1370,6 +1379,21 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    if (configurationInput) configurationInput.value = \'\';' +
                 '    filterTable(sectionId);' +
                 '    recalculatePercentages(sectionId);' +
+                '}' +
+                '' +
+                '/* Hierarchical classification cell highlighting */' +
+                'function highlightClassificationCells(row, cellIndex) {' +
+                '    var cells = row.querySelectorAll("td.class-cell");' +
+                '    for (var i = 0; i < cellIndex && i < cells.length; i++) {' +
+                '        cells[i].classList.add("hierarchy-hover");' +
+                '    }' +
+                '}' +
+                '' +
+                'function clearClassificationHighlight(row) {' +
+                '    var cells = row.querySelectorAll("td.class-cell");' +
+                '    for (var i = 0; i < cells.length; i++) {' +
+                '        cells[i].classList.remove("hierarchy-hover");' +
+                '    }' +
                 '}' +
                 '' +
                 '/* Sort table */' +
@@ -1435,6 +1459,9 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '' +
                 '/* Export table to Excel using SheetJS */' +
                 'function exportToExcel(sectionId) {' +
+                '    if (sectionId === \'summary\') {' +
+                '        recalculatePercentages(sectionId);' +
+                '    }' +
                 '    var table = document.getElementById(\'table-\' + sectionId);' +
                 '    if (!table) { alert(\'No data to export\'); return; }' +
                 '    ' +
@@ -1473,14 +1500,29 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    XLSX.writeFile(wb, fileName);' +
                 '}' +
                 '' +
-                '/* Recalculate percentages based on visible rows */' +
+                '/* Recalculate percentages and totals based on visible rows */' +
                 'function recalculatePercentages(sectionId) {' +
                 '    var table = document.getElementById(\'table-\' + sectionId);' +
                 '    if (!table) return;' +
                 '    var brandCount = parseInt(table.getAttribute(\'data-brand-count\')) || 4;' +
                 '    var tbody = table.querySelector(\'tbody\');' +
                 '    var rows = tbody.querySelectorAll(\'tr:not(.summary-row)\');' +
+                '    var summaryRow = tbody.querySelector(\'.summary-row\');' +
                 '    var categoryTotals = {};' +
+                '    var grandTotals = {' +
+                '        brandAmounts: [],' +
+                '        brandQuantities: [],' +
+                '        selectedBrandsTotal: 0,' +
+                '        selectedBrandsQty: 0,' +
+                '        otherBrandsAmount: 0,' +
+                '        otherBrandsQty: 0,' +
+                '        totalAmount: 0,' +
+                '        lineCount: 0' +
+                '    };' +
+                '    for (var b = 0; b < brandCount; b++) {' +
+                '        grandTotals.brandAmounts.push(0);' +
+                '        grandTotals.brandQuantities.push(0);' +
+                '    }' +
                 '    for (var i = 0; i < rows.length; i++) {' +
                 '        var row = rows[i];' +
                 '        if (row.style.display === \'none\') continue;' +
@@ -1498,15 +1540,28 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '            var brandAmount = parseFloat(cells[cellIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
                 '            categoryTotals[category].brandAmounts[b] += brandAmount;' +
                 '            rowSelectedBrandsTotal += brandAmount;' +
+                '            grandTotals.brandAmounts[b] += brandAmount;' +
+                '            grandTotals.selectedBrandsTotal += brandAmount;' +
+                '            var qtyText = (cells[cellIndex].getAttribute(\'title\') || \'\').replace(/[^0-9]/g, \'\');' +
+                '            var qty = parseInt(qtyText) || 0;' +
+                '            grandTotals.brandQuantities[b] += qty;' +
+                '            grandTotals.selectedBrandsQty += qty;' +
                 '            cellIndex += 2;' +
                 '        }' +
                 '        categoryTotals[category].selectedBrandsTotal += rowSelectedBrandsTotal;' +
                 '        var otherBrandsIndex = 3 + (brandCount * 2) + 2;' +
                 '        var allBrandsIndex = 3 + (brandCount * 2) + 4;' +
+                '        var qtyIndex = allBrandsIndex + 2;' +
                 '        var otherBrandsAmount = parseFloat(cells[otherBrandsIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
                 '        var allBrandsAmount = parseFloat(cells[allBrandsIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
+                '        var lineCount = parseInt(cells[qtyIndex].textContent.replace(/[^0-9]/g, \'\')) || 0;' +
                 '        categoryTotals[category].otherBrandsAmount += otherBrandsAmount;' +
                 '        categoryTotals[category].allBrandsAmount += allBrandsAmount;' +
+                '        var otherQtyText = (cells[otherBrandsIndex].getAttribute(\'title\') || \'\').replace(/[^0-9]/g, \'\');' +
+                '        grandTotals.otherBrandsAmount += otherBrandsAmount;' +
+                '        grandTotals.otherBrandsQty += parseInt(otherQtyText) || 0;' +
+                '        grandTotals.totalAmount += allBrandsAmount;' +
+                '        grandTotals.lineCount += lineCount;' +
                 '    }' +
                 '    for (var i = 0; i < rows.length; i++) {' +
                 '        var row = rows[i];' +
@@ -1539,7 +1594,35 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        cells[otherBrandsPctIndex].textContent = otherBrandsPct + \'%\';' +
                 '        cells[allBrandsPctIndex].textContent = allBrandsPct + \'%\';' +
                 '    }' +
-                '    alert(\'Percentages recalculated based on \' + Object.keys(categoryTotals).length + \' visible categor(ies)!\');' +
+                '    if (summaryRow) {' +
+                '        var summaryCells = summaryRow.cells;' +
+                '        var cellIndex = 3;' +
+                '        for (var b = 0; b < brandCount; b++) {' +
+                '            if (summaryCells[cellIndex]) {' +
+                '                summaryCells[cellIndex].textContent = formatCurrency(grandTotals.brandAmounts[b]);' +
+                '                summaryCells[cellIndex].setAttribute(\'title\', \'Quantity: \' + grandTotals.brandQuantities[b]);' +
+                '            }' +
+                '            cellIndex += 2;' +
+                '        }' +
+                '        if (summaryCells[cellIndex]) {' +
+                '            summaryCells[cellIndex].textContent = formatCurrency(grandTotals.selectedBrandsTotal);' +
+                '            summaryCells[cellIndex].setAttribute(\'title\', \'Quantity: \' + grandTotals.selectedBrandsQty);' +
+                '        }' +
+                '        cellIndex += 2;' +
+                '        if (summaryCells[cellIndex]) {' +
+                '            summaryCells[cellIndex].textContent = formatCurrency(grandTotals.otherBrandsAmount);' +
+                '            summaryCells[cellIndex].setAttribute(\'title\', \'Quantity: \' + grandTotals.otherBrandsQty);' +
+                '        }' +
+                '        cellIndex += 2;' +
+                '        if (summaryCells[cellIndex]) {' +
+                '            summaryCells[cellIndex].textContent = formatCurrency(grandTotals.totalAmount);' +
+                '        }' +
+                '        cellIndex += 2;' +
+                '        if (summaryCells[cellIndex]) {' +
+                '            summaryCells[cellIndex].textContent = grandTotals.lineCount;' +
+                '        }' +
+                '    }' +
+                '    alert(\'Totals and percentages recalculated based on \' + Object.keys(categoryTotals).length + \' visible categor(ies)!\');' +
                 '}';
         }
 
