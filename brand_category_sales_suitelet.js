@@ -884,6 +884,15 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
          */
         function buildSummaryTable(data, categoryTotals, selectedBrands, brandCount, scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
             var html = '';
+            
+            // Sort data by category for subtotal grouping
+            var sortedData = data.slice().sort(function(a, b) {
+                var catCompare = (a.class1 || '').localeCompare(b.class1 || '');
+                if (catCompare !== 0) return catCompare;
+                var subCatCompare = (a.class2 || '').localeCompare(b.class2 || '');
+                if (subCatCompare !== 0) return subCatCompare;
+                return (a.class3 || '').localeCompare(b.class3 || '');
+            });
 
             html += '<div class="table-container">';
             html += '<table class="data-table" id="table-summary" data-brand-count="' + brandCount + '">';
@@ -918,6 +927,10 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
             html += '</tr>';
             html += '</thead>';
             html += '<tbody>';
+            
+            // Track category for subtotals
+            var currentCategory = null;
+            var categorySubtotals = null;
 
             // Initialize totals
             var totals = {
@@ -936,8 +949,34 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 totals.brandQuantities.push(0);
             }
 
-            for (var i = 0; i < data.length; i++) {
-                var row = data[i];
+            for (var i = 0; i < sortedData.length; i++) {
+                var row = sortedData[i];
+                
+                // Check if category changed - insert subtotal for previous category
+                if (currentCategory !== null && row.class1 !== currentCategory) {
+                    html += generateCategorySubtotal(currentCategory, categorySubtotals, brandCount);
+                    categorySubtotals = null;
+                }
+                
+                // Initialize new category tracking
+                if (categorySubtotals === null) {
+                    currentCategory = row.class1;
+                    categorySubtotals = {
+                        brandAmounts: [],
+                        brandQuantities: [],
+                        selectedBrandsTotal: 0,
+                        selectedBrandsQty: 0,
+                        otherBrandsAmount: 0,
+                        otherBrandsQty: 0,
+                        totalAmount: 0,
+                        lineCount: 0
+                    };
+                    for (var b = 0; b < brandCount; b++) {
+                        categorySubtotals.brandAmounts.push(0);
+                        categorySubtotals.brandQuantities.push(0);
+                    }
+                }
+                
                 var rowClass = (i % 2 === 0) ? 'even-row' : 'odd-row';
 
                 // Calculate selected brands total for this row
@@ -958,6 +997,18 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 totals.totalAmount += row.totalAmount;
                 totals.transactionCount += row.transactionCount;
                 totals.lineCount += row.lineCount;
+                
+                // Add to category subtotals
+                for (var b = 0; b < row.brandAmounts.length; b++) {
+                    categorySubtotals.brandAmounts[b] += row.brandAmounts[b];
+                    categorySubtotals.brandQuantities[b] += row.brandQuantities[b];
+                }
+                categorySubtotals.selectedBrandsTotal += selectedBrandsTotal;
+                categorySubtotals.selectedBrandsQty += selectedBrandsQty;
+                categorySubtotals.otherBrandsAmount += row.otherBrandsAmount;
+                categorySubtotals.otherBrandsQty += row.otherBrandsQty;
+                categorySubtotals.totalAmount += row.totalAmount;
+                categorySubtotals.lineCount += row.lineCount;
 
                 // Build drill-down URLs for different classification levels
                 var baseUrl = scriptUrl + '&loadData=T&view=detail';
@@ -1013,6 +1064,33 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 html += '<td class="amount percent">' + allBrandsPct + '%</td>';
                 html += '<td class="center">' + row.lineCount + '</td>';
                 html += '</tr>';
+            }
+            
+            // Add final category subtotal
+            if (currentCategory !== null && categorySubtotals !== null) {
+                html += generateCategorySubtotal(currentCategory, categorySubtotals, brandCount);
+            }
+            
+            // Helper function to generate category subtotal row
+            function generateCategorySubtotal(category, subtotals, brandCount) {
+                var subtotalHtml = '<tr class="category-subtotal-row" data-category="' + escapeHtml(category || '') + '">';
+                subtotalHtml += '<td colspan="3">Subtotal: ' + escapeHtml(formatDisplayText(category || 'Unknown')) + '</td>';
+                
+                for (var b = 0; b < brandCount; b++) {
+                    subtotalHtml += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);" title="Quantity: ' + subtotals.brandQuantities[b] + '">' + formatCurrency(subtotals.brandAmounts[b]) + '</td>';
+                    subtotalHtml += '<td></td>';
+                }
+                
+                subtotalHtml += '<td class="amount total-amount" title="Quantity: ' + subtotals.selectedBrandsQty + '">' + formatCurrency(subtotals.selectedBrandsTotal) + '</td>';
+                subtotalHtml += '<td></td>';
+                subtotalHtml += '<td class="amount total-amount" title="Quantity: ' + subtotals.otherBrandsQty + '">' + formatCurrency(subtotals.otherBrandsAmount) + '</td>';
+                subtotalHtml += '<td></td>';
+                subtotalHtml += '<td class="amount total-amount">' + formatCurrency(subtotals.totalAmount) + '</td>';
+                subtotalHtml += '<td></td>';
+                subtotalHtml += '<td class="center">' + subtotals.lineCount + '</td>';
+                subtotalHtml += '</tr>';
+                
+                return subtotalHtml;
             }
 
             // Add summary row
@@ -1258,6 +1336,12 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '.clickable-row { cursor: pointer; transition: background-color 0.2s; }' +
                 '.clickable-row:hover td { background-color: #e3f2fd !important; }' +
                 '' +
+                '/* Category subtotal row styles */' +
+                '.category-subtotal-row { background: #fff3cd !important; font-weight: 600; border-top: 2px solid #ffc107 !important; border-bottom: 2px solid #ffc107 !important; }' +
+                '.category-subtotal-row td { background: #fff3cd !important; }' +
+                '.category-subtotal-row:hover td { background: #fff3cd !important; }' +
+                '.category-subtotal-row td:first-child { font-style: italic; color: #856404; padding-left: 20px !important; }' +
+                '' +
                 '/* Summary row */' +
                 '.summary-row { background-color: #f0f0f0 !important; border-top: 2px solid #333 !important; font-weight: bold; position: sticky; bottom: 0; z-index: 100; box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1); }' +
                 '.summary-row td { background-color: #f0f0f0 !important; font-weight: bold; }' +
@@ -1337,6 +1421,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    var tbody = document.querySelector(\'#table-\' + sectionId + \' tbody\');' +
                 '    var rows = tbody.querySelectorAll(\'tr:not(.summary-row)\');' +
                 '    var visibleCount = 0;' +
+                '    var visibleCategories = {};' +
                 '    ' +
                 '    for (var i = 0; i < rows.length; i++) {' +
                 '        var row = rows[i];' +
@@ -1344,6 +1429,10 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        ' +
                 '        if (cells.length < 3) {' +
                 '            row.style.display = \'\';' +
+                '            continue;' +
+                '        }' +
+                '        ' +
+                '        if (row.classList.contains("category-subtotal-row")) {' +
                 '            continue;' +
                 '        }' +
                 '        ' +
@@ -1372,8 +1461,24 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        if (textMatch && brandMatch) {' +
                 '            row.style.display = \'\';' +
                 '            visibleCount++;' +
+                '            var categoryCell = cells[0];' +
+                '            if (categoryCell) {' +
+                '                var categoryText = categoryCell.textContent || categoryCell.innerText;' +
+                '                visibleCategories[categoryText] = true;' +
+                '            }' +
                 '        } else {' +
                 '            row.style.display = \'none\';' +
+                '        }' +
+                '    }' +
+                '    ' +
+                '    var subtotalRows = tbody.querySelectorAll(\'tr.category-subtotal-row\');' +
+                '    for (var i = 0; i < subtotalRows.length; i++) {' +
+                '        var subtotalRow = subtotalRows[i];' +
+                '        var category = subtotalRow.getAttribute(\'data-category\');' +
+                '        if (visibleCategories[category]) {' +
+                '            subtotalRow.style.display = \'\';' +
+                '        } else {' +
+                '            subtotalRow.style.display = \'none\';' +
                 '        }' +
                 '    }' +
                 '    ' +
@@ -1593,7 +1698,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    if (!table) return;' +
                 '    var brandCount = parseInt(table.getAttribute(\'data-brand-count\')) || 4;' +
                 '    var tbody = table.querySelector(\'tbody\');' +
-                '    var rows = tbody.querySelectorAll(\'tr:not(.summary-row)\');' +
+                '    var rows = tbody.querySelectorAll(\'tr:not(.summary-row):not(.category-subtotal-row)\');' +
                 '    var summaryRow = tbody.querySelector(\'.summary-row\');' +
                 '    var categoryTotals = {};' +
                 '    var grandTotals = {' +
@@ -1645,10 +1750,65 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        categoryTotals[category].otherBrandsAmount += otherBrandsAmount;' +
                 '        categoryTotals[category].allBrandsAmount += allBrandsAmount;' +
                 '        var otherQtyText = (cells[otherBrandsIndex].getAttribute(\'title\') || \'\').replace(/[^0-9]/g, \'\');' +
+                '        if (!categoryTotals[category].brandQuantities) {' +
+                '            categoryTotals[category].brandQuantities = [];' +
+                '            for (var b = 0; b < brandCount; b++) {' +
+                '                categoryTotals[category].brandQuantities.push(0);' +
+                '            }' +
+                '            categoryTotals[category].selectedBrandsQty = 0;' +
+                '            categoryTotals[category].otherBrandsQty = 0;' +
+                '            categoryTotals[category].lineCount = 0;' +
+                '        }' +
+                '        var qtyIndex = allBrandsIndex + 2;' +
+                '        var lineCount = parseInt(cells[qtyIndex].textContent.replace(/[^0-9]/g, \'\')) || 0;' +
+                '        categoryTotals[category].otherBrandsQty += parseInt(otherQtyText) || 0;' +
+                '        categoryTotals[category].lineCount += lineCount;' +
+                '        var cellIdx = 3;' +
+                '        for (var b = 0; b < brandCount; b++) {' +
+                '            var qtyText = (cells[cellIdx].getAttribute(\'title\') || \'\').replace(/[^0-9]/g, \'\');' +
+                '            var qty = parseInt(qtyText) || 0;' +
+                '            categoryTotals[category].brandQuantities[b] += qty;' +
+                '            categoryTotals[category].selectedBrandsQty += qty;' +
+                '            cellIdx += 2;' +
+                '        }' +
                 '        grandTotals.otherBrandsAmount += otherBrandsAmount;' +
                 '        grandTotals.otherBrandsQty += parseInt(otherQtyText) || 0;' +
                 '        grandTotals.totalAmount += allBrandsAmount;' +
                 '        grandTotals.lineCount += lineCount;' +
+                '    }' +
+                '    var subtotalRows = tbody.querySelectorAll(\'tr.category-subtotal-row\');' +
+                '    for (var i = 0; i < subtotalRows.length; i++) {' +
+                '        var subtotalRow = subtotalRows[i];' +
+                '        if (subtotalRow.style.display === \'none\') continue;' +
+                '        var category = subtotalRow.getAttribute(\'data-category\');' +
+                '        var catTotal = categoryTotals[category];' +
+                '        if (!catTotal) continue;' +
+                '        var cells = subtotalRow.cells;' +
+                '        var cellIndex = 1;' +
+                '        for (var b = 0; b < brandCount; b++) {' +
+                '            if (cells[cellIndex]) {' +
+                '                cells[cellIndex].textContent = formatCurrency(catTotal.brandAmounts[b]);' +
+                '                cells[cellIndex].setAttribute(\'title\', \'Quantity: \' + (catTotal.brandQuantities[b] || 0));' +
+                '            }' +
+                '            cellIndex += 2;' +
+                '        }' +
+                '        if (cells[cellIndex]) {' +
+                '            cells[cellIndex].textContent = formatCurrency(catTotal.selectedBrandsTotal);' +
+                '            cells[cellIndex].setAttribute(\'title\', \'Quantity: \' + (catTotal.selectedBrandsQty || 0));' +
+                '        }' +
+                '        cellIndex += 2;' +
+                '        if (cells[cellIndex]) {' +
+                '            cells[cellIndex].textContent = formatCurrency(catTotal.otherBrandsAmount);' +
+                '            cells[cellIndex].setAttribute(\'title\', \'Quantity: \' + (catTotal.otherBrandsQty || 0));' +
+                '        }' +
+                '        cellIndex += 2;' +
+                '        if (cells[cellIndex]) {' +
+                '            cells[cellIndex].textContent = formatCurrency(catTotal.allBrandsAmount);' +
+                '        }' +
+                '        cellIndex += 2;' +
+                '        if (cells[cellIndex]) {' +
+                '            cells[cellIndex].textContent = catTotal.lineCount || 0;' +
+                '        }' +
                 '    }' +
                 '    for (var i = 0; i < rows.length; i++) {' +
                 '        var row = rows[i];' +
