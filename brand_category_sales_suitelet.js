@@ -138,8 +138,9 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     var separator = scriptUrl.indexOf('?') > -1 ? '&' : '?';
                     var loadDataUrl = scriptUrl + separator + 'loadData=T&startdate=' + startDate + '&enddate=' + endDate;
                     
-                    // Load brand list for selectors
+                    // Load brand list and parent company list for selectors
                     var brandList = getBrandList();
+                    var parentCompanyList = getParentCompanyList();
                     
                     html += '<style>' + getStyles() + '</style>';
                     html += '<div class="portal-container">';
@@ -166,10 +167,10 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     html += '</div>';
                     html += '</div>';
                     
-                    // Brand selectors
+                    // Brand selectors with parent company filter
                     html += '<div style="margin-bottom:20px;">';
                     html += '<div style="margin-bottom:10px;font-weight:500;color:#555;">Selected Brands (Choose up to 6):</div>';
-                    html += buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
+                    html += buildBrandSelectors(brandList, parentCompanyList, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
                     html += '</div>';
                     
                     html += '</div>';
@@ -178,6 +179,27 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                     html += '</div>';
                     html += '</div>';
                     html += '<script>';
+                    html += 'function applyParentCompanyFilter() {';
+                    html += '  var parentCompanyId = document.getElementById("parentCompanyFilter").value;';
+                    html += '  if (!parentCompanyId) return;';
+                    html += '  var brands = [];';
+                    html += '  var select = document.getElementById("brand1");';
+                    html += '  var options = select.querySelectorAll("option[data-parent=\'" + parentCompanyId + "\']");';
+                    html += '  for (var j = 0; j < options.length && brands.length < 6; j++) {';
+                    html += '    brands.push(options[j].value);';
+                    html += '  }';
+                    html += '  for (var i = 1; i <= 6; i++) {';
+                    html += '    var select = document.getElementById("brand" + i);';
+                    html += '    select.value = brands[i - 1] || "";';
+                    html += '  }';
+                    html += '}';
+                    html += 'function clearParentCompanyFilter() {';
+                    html += '  document.getElementById("parentCompanyFilter").value = "";';
+                    html += '  for (var i = 1; i <= 6; i++) {';
+                    html += '    document.getElementById("brand" + i).value = "";';
+                    html += '  }';
+                    html += '}';
+                    html += 'document.getElementById("parentCompanyFilter").addEventListener("change", applyParentCompanyFilter);';
                     html += 'function loadReportData() {';
                     html += '  var btn = document.getElementById("loadDataBtn");';
                     html += '  btn.disabled = true;';
@@ -270,8 +292,9 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
         function buildSummaryView(scriptUrl, startDate, endDate, department, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
             var html = '';
             
-            // Load brand list for selectors
+            // Load brand list and parent company list for selectors
             var brandList = getBrandList();
+            var parentCompanyList = getParentCompanyList();
             
             html += '<div class="section-description">Invoice and Credit Memo Inventory Line Items, Split by Category, Sub-Category and Configuration. Click Any Row for Drill Down Transaction Details.</div>';
 
@@ -289,7 +312,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             // Brand selectors
             html += '<div style="margin-top: 15px;">';
             html += '<div style="margin-bottom: 8px; font-weight: 500; color: #555;">Selected Brands:</div>';
-            html += buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
+            html += buildBrandSelectors(brandList, parentCompanyList, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id);
             html += '</div>';
             
             html += '<div style="margin-top: 15px;">';
@@ -310,6 +333,7 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             html += '<input type="text" id="searchCategory-summary" class="search-box" placeholder="Search Category..." onkeyup="filterTable(\'summary\')" style="flex:1;">';
             html += '<input type="text" id="searchSubCategory-summary" class="search-box" placeholder="Search Sub-Category..." onkeyup="filterTable(\'summary\')" style="flex:1;">';
             html += '<input type="text" id="searchConfiguration-summary" class="search-box" placeholder="Search Configuration..." onkeyup="filterTable(\'summary\')" style="flex:1;">';
+            html += '<label style="display: flex; align-items: center; margin-left: 10px; white-space: nowrap;"><input type="checkbox" id="showSubtotals-summary" checked onchange="toggleSubtotals(\'summary\')" style="margin-right: 5px;">Show Subtotals</label>';
             html += '<button type="button" class="export-btn" onclick="exportToExcel(\'summary\')">📥 Export to Excel</button>';
             html += '</div>';
             html += '<span class="search-results-count" id="searchCount-summary"></span>';
@@ -563,7 +587,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
         function getBrandList() {
             try {
                 var sql = 
-                    'SELECT brand.id, brand.name, parent.name AS parent_company ' +
+                    'SELECT brand.id, brand.name, parent.name AS parent_company, brand.custrecord_bas_parent_company AS parent_company_id ' +
                     'FROM customrecord_bas_brand_name_list brand ' +
                     'LEFT JOIN customlist_bas_parent_company_list parent ' +
                     '    ON parent.id = brand.custrecord_bas_parent_company ' +
@@ -576,6 +600,35 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 return brands;
             } catch (e) {
                 log.error('Error loading brand list', {
+                    error: e.message,
+                    stack: e.stack
+                });
+                return [];
+            }
+        }
+
+        /**
+         * Gets list of parent companies with more than one child brand
+         * @returns {Array} Array of parent company objects with id, name
+         */
+        function getParentCompanyList() {
+            try {
+                var sql = 
+                    'SELECT parent.id, parent.name, COUNT(brand.id) AS brand_count ' +
+                    'FROM customlist_bas_parent_company_list parent ' +
+                    'INNER JOIN customrecord_bas_brand_name_list brand ' +
+                    '    ON brand.custrecord_bas_parent_company = parent.id ' +
+                    'GROUP BY parent.id, parent.name ' +
+                    'HAVING COUNT(brand.id) > 1 ' +
+                    'ORDER BY parent.name';
+                
+                var resultSet = query.runSuiteQL({query: sql});
+                var parentCompanies = resultSet.asMappedResults();
+                
+                log.debug('Parent Company List Loaded', parentCompanies.length + ' parent companies with multiple brands found');
+                return parentCompanies;
+            } catch (e) {
+                log.error('Error loading parent company list', {
                     error: e.message,
                     stack: e.stack
                 });
@@ -612,14 +665,34 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
         /**
          * Builds brand selector dropdowns
          * @param {Array} brandList - List of all brands
+         * @param {Array} parentCompanyList - List of parent companies
          * @param {string} brand1Id - Selected brand 1 ID
          * @param {string} brand2Id - Selected brand 2 ID
          * @param {string} brand3Id - Selected brand 3 ID
          * @param {string} brand4Id - Selected brand 4 ID
+         * @param {string} brand5Id - Selected brand 5 ID
+         * @param {string} brand6Id - Selected brand 6 ID
          * @returns {string} HTML for brand selector dropdowns
          */
-        function buildBrandSelectors(brandList, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
+        function buildBrandSelectors(brandList, parentCompanyList, brand1Id, brand2Id, brand3Id, brand4Id, brand5Id, brand6Id) {
             var html = '';
+            
+            // Parent Company Quick Filter
+            html += '<div style="background: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 8px; padding: 15px; margin-bottom: 20px;">';
+            html += '<div style="display: flex; align-items: center; gap: 15px;">';
+            html += '<label for="parentCompanyFilter" style="font-weight: 600; color: #0c4a6e; white-space: nowrap;">Quick Filter by Parent Company:</label>';
+            html += '<select id="parentCompanyFilter" style="padding: 8px 12px; border: 2px solid #0ea5e9; border-radius: 4px; font-size: 14px; flex: 1; background: white;">';
+            html += '<option value="">-- Select Parent Company to Auto-Populate Brands --</option>';
+            
+            for (var i = 0; i < parentCompanyList.length; i++) {
+                html += '<option value="' + escapeHtml(parentCompanyList[i].id) + '">' + escapeHtml(parentCompanyList[i].name) + '</option>';
+            }
+            
+            html += '</select>';
+            html += '<button type="button" onclick="clearParentCompanyFilter()" style="padding: 8px 16px; background: #64748b; color: white; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; white-space: nowrap;">Clear</button>';
+            html += '</div>';
+            html += '<div style="margin-top: 8px; font-size: 12px; color: #475569; font-style: italic;">Selecting a parent company will auto-populate Brand 1-6 with brands from that company (up to 6 brands)</div>';
+            html += '</div>';
             
             html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">';
             
@@ -639,7 +712,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                     if (brandList[i].parent_company) {
                         displayName += ' (' + escapeHtml(brandList[i].parent_company) + ')';
                     }
-                    html += '<option value="' + escapeHtml(brandList[i].id) + '"' + selected + '>' + displayName + '</option>';
+                    html += '<option value="' + escapeHtml(brandList[i].id) + '"' + selected + ' data-parent="' + escapeHtml(brandList[i].parent_company_id || '') + '">' + displayName + '</option>';
                 }
                 
                 html += '</select>';
@@ -1046,15 +1119,15 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                     var brandAmount = row.brandAmounts[b];
                     var brandQty = row.brandQuantities[b];
                     var catBrandTotal = catTotal.brandAmounts && catTotal.brandAmounts[b] ? catTotal.brandAmounts[b] : 0;
-                    var brandPct = catBrandTotal > 0 ? (brandAmount / catBrandTotal * 100).toFixed(2) : '0.00';
+                    var brandPct = catBrandTotal > 0 ? (Math.round(brandAmount / catBrandTotal * 10000) / 100).toFixed(2) : '0.00';
                     
                     html += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);" title="Quantity: ' + brandQty + '">' + formatCurrency(brandAmount) + '</td>';
                     html += '<td class="amount percent">' + brandPct + '%</td>';
                 }
                 
-                var selectedBrandsPct = catTotal.totalAmount > 0 ? (selectedBrandsTotal / catTotal.totalAmount * 100).toFixed(2) : '0.00';
-                var otherBrandsPct = catTotal.otherBrandsAmount > 0 ? (row.otherBrandsAmount / catTotal.otherBrandsAmount * 100).toFixed(2) : '0.00';
-                var allBrandsPct = catTotal.totalAmount > 0 ? (row.totalAmount / catTotal.totalAmount * 100).toFixed(2) : '0.00';
+                var selectedBrandsPct = catTotal.totalAmount > 0 ? (Math.round(selectedBrandsTotal / catTotal.totalAmount * 10000) / 100).toFixed(2) : '0.00';
+                var otherBrandsPct = catTotal.otherBrandsAmount > 0 ? (Math.round(row.otherBrandsAmount / catTotal.otherBrandsAmount * 10000) / 100).toFixed(2) : '0.00';
+                var allBrandsPct = catTotal.totalAmount > 0 ? (Math.round(row.totalAmount / catTotal.totalAmount * 10000) / 100).toFixed(2) : '0.00';
 
                 html += '<td class="amount total-amount" title="Quantity: ' + selectedBrandsQty + '">' + formatCurrency(selectedBrandsTotal) + '</td>';
                 html += '<td class="amount percent">' + selectedBrandsPct + '%</td>';
@@ -1077,16 +1150,22 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 subtotalHtml += '<td colspan="3">Subtotal: ' + escapeHtml(formatDisplayText(category || 'Unknown')) + '</td>';
                 
                 for (var b = 0; b < brandCount; b++) {
-                    subtotalHtml += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);" title="Quantity: ' + subtotals.brandQuantities[b] + '">' + formatCurrency(subtotals.brandAmounts[b]) + '</td>';
-                    subtotalHtml += '<td></td>';
+                    var brandAmt = subtotals.brandAmounts[b] || 0;
+                    var brandPct = brandAmt > 0 ? '100.00%' : '0.00%';
+                    subtotalHtml += '<td class="amount" style="background-color: rgba(144, 238, 144, 0.15);" title="Quantity: ' + subtotals.brandQuantities[b] + '">' + formatCurrency(brandAmt) + '</td>';
+                    subtotalHtml += '<td class="center">' + brandPct + '</td>';
                 }
                 
+                var selectedPct = subtotals.selectedBrandsTotal > 0 ? '100.00%' : '0.00%';
+                var otherPct = subtotals.otherBrandsAmount > 0 ? '100.00%' : '0.00%';
+                var allPct = subtotals.totalAmount > 0 ? '100.00%' : '0.00%';
+                
                 subtotalHtml += '<td class="amount total-amount" title="Quantity: ' + subtotals.selectedBrandsQty + '">' + formatCurrency(subtotals.selectedBrandsTotal) + '</td>';
-                subtotalHtml += '<td></td>';
+                subtotalHtml += '<td class="center">' + selectedPct + '</td>';
                 subtotalHtml += '<td class="amount total-amount" title="Quantity: ' + subtotals.otherBrandsQty + '">' + formatCurrency(subtotals.otherBrandsAmount) + '</td>';
-                subtotalHtml += '<td></td>';
+                subtotalHtml += '<td class="center">' + otherPct + '</td>';
                 subtotalHtml += '<td class="amount total-amount">' + formatCurrency(subtotals.totalAmount) + '</td>';
-                subtotalHtml += '<td></td>';
+                subtotalHtml += '<td class="center">' + allPct + '</td>';
                 subtotalHtml += '<td class="center">' + subtotals.lineCount + '</td>';
                 subtotalHtml += '</tr>';
                 
@@ -1337,10 +1416,10 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '.clickable-row:hover td { background-color: #e3f2fd !important; }' +
                 '' +
                 '/* Category subtotal row styles */' +
-                '.category-subtotal-row { background: #fff3cd !important; font-weight: 600; border-top: 2px solid #ffc107 !important; border-bottom: 2px solid #ffc107 !important; }' +
-                '.category-subtotal-row td { background: #fff3cd !important; }' +
-                '.category-subtotal-row:hover td { background: #fff3cd !important; }' +
-                '.category-subtotal-row td:first-child { font-style: italic; color: #856404; padding-left: 20px !important; }' +
+                '.category-subtotal-row { background: #2E7D32 !important; font-weight: 600; border-top: 2px solid #1B5E20 !important; border-bottom: 2px solid #1B5E20 !important; color: #fff !important; }' +
+                '.category-subtotal-row td { background: #2E7D32 !important; color: #fff !important; }' +
+                'table.data-table tbody tr.category-subtotal-row:hover td { background: #388E3C !important; color: #fff !important; }' +
+                '.category-subtotal-row td:first-child { font-style: italic; padding-left: 20px !important; }' +
                 '' +
                 '/* Summary row */' +
                 '.summary-row { background-color: #f0f0f0 !important; border-top: 2px solid #333 !important; font-weight: bold; position: sticky; bottom: 0; z-index: 100; box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1); }' +
@@ -1355,6 +1434,33 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
          */
         function getJavaScript(scriptUrl) {
             return '' +
+                '/* Parent Company Filter Functions */' +
+                'function applyParentCompanyFilter() {' +
+                '    var parentCompanyId = document.getElementById("parentCompanyFilter").value;' +
+                '    if (!parentCompanyId) return;' +
+                '    var brands = [];' +
+                '    var select = document.getElementById("brand1");' +
+                '    var options = select.querySelectorAll("option[data-parent=\'" + parentCompanyId + "\']");' +
+                '    for (var j = 0; j < options.length && brands.length < 6; j++) {' +
+                '        brands.push(options[j].value);' +
+                '    }' +
+                '    for (var i = 1; i <= 6; i++) {' +
+                '        var select = document.getElementById("brand" + i);' +
+                '        select.value = brands[i - 1] || "";' +
+                '    }' +
+                '}' +
+                '' +
+                'function clearParentCompanyFilter() {' +
+                '    document.getElementById("parentCompanyFilter").value = "";' +
+                '    for (var i = 1; i <= 6; i++) {' +
+                '        document.getElementById("brand" + i).value = "";' +
+                '    }' +
+                '}' +
+                '' +
+                'if (document.getElementById("parentCompanyFilter")) {' +
+                '    document.getElementById("parentCompanyFilter").addEventListener("change", applyParentCompanyFilter);' +
+                '}' +
+                '' +
                 '/* Format currency value */' +
                 'function formatCurrency(value, preserveSign) {' +
                 '    if (!value && value !== 0) return \'$0.00\';' +
@@ -1502,6 +1608,24 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    }' +
                 '}' +
                 '' +
+                '/* Toggle subtotal rows visibility */' +
+                'function toggleSubtotals(sectionId) {' +
+                '    var checkbox = document.getElementById(\'showSubtotals-\' + sectionId);' +
+                '    var table = document.getElementById(\'table-\' + sectionId);' +
+                '    if (!table) return;' +
+                '    ' +
+                '    if (checkbox.checked) {' +
+                '        table.removeAttribute(\'data-sort-col\');' +
+                '        table.removeAttribute(\'data-sort-dir\');' +
+                '        sortTable(sectionId, 0);' +
+                '    } else {' +
+                '        var subtotalRows = table.querySelectorAll(\'tr.category-subtotal-row\');' +
+                '        for (var i = 0; i < subtotalRows.length; i++) {' +
+                '            subtotalRows[i].style.display = \'none\';' +
+                '        }' +
+                '    }' +
+                '}' +
+                '' +
                 '/* Clear search filters and recalculate percentages */' +
                 'function clearSearchAndRecalc(sectionId) {' +
                 '    var categoryInput = document.getElementById(\'searchCategory-\' + sectionId);' +
@@ -1533,7 +1657,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 'function sortTable(sectionId, columnIndex) {' +
                 '    var table = document.getElementById(\'table-\' + sectionId);' +
                 '    var tbody = table.querySelector(\'tbody\');' +
-                '    var rows = Array.from(tbody.querySelectorAll(\'tr:not(.summary-row)\'));' +
+                '    var rows = Array.from(tbody.querySelectorAll(\'tr:not(.summary-row):not(.category-subtotal-row)\'));' +
                 '    var currentSort = table.getAttribute(\'data-sort-col\');' +
                 '    var currentDir = table.getAttribute(\'data-sort-dir\') || \'asc\';' +
                 '    var newDir = (currentSort == columnIndex && currentDir == \'asc\') ? \'desc\' : \'asc\';' +
@@ -1572,8 +1696,180 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '    });' +
                 '    ' +
                 '    var summaryRow = tbody.querySelector(\'.summary-row\');' +
-                '    rows.forEach(function(row) { tbody.appendChild(row); });' +
+                '    ' +
+                '    if (columnIndex === 0) {' +
+                '        var subtotalRows = tbody.querySelectorAll(\'tr.category-subtotal-row\');' +
+                '        for (var i = 0; i < subtotalRows.length; i++) {' +
+                '            subtotalRows[i].remove();' +
+                '        }' +
+                '        ' +
+                '        var showSubtotalsCheckbox = document.getElementById(\'showSubtotals-\' + sectionId);' +
+                '        var showSubtotals = showSubtotalsCheckbox ? showSubtotalsCheckbox.checked : true;' +
+                '        ' +
+                '        if (showSubtotals) {' +
+                '            var thead = table.querySelector(\'thead\');' +
+                '            var headerCells = thead ? thead.querySelectorAll(\'th\') : [];' +
+                '            var numBrandCols = 0;' +
+                '            for (var i = 3; i < headerCells.length; i++) {' +
+                '                var headerText = headerCells[i].textContent.replace(/ [▲▼]/g, \'\').trim();' +
+                '                if (headerText.indexOf(\'Selected Brands\') !== -1 || headerText.indexOf(\'All Other Brands\') !== -1 || headerText.indexOf(\'All Brands\') !== -1 || headerText === \'QTY\') {' +
+                '                    break;' +
+                '                }' +
+                '                if (headerText && headerText.indexOf(\'%\') === -1) {' +
+                '                    numBrandCols++;' +
+                '                }' +
+                '            }' +
+                '            ' +
+                '            var currentCategory = null;' +
+                '        var categoryTotals = null;' +
+                '        var categoryRows = [];' +
+                '        ' +
+                '        for (var i = 0; i < rows.length; i++) {' +
+                '            var row = rows[i];' +
+                '            if (row.style.display === \'none\') continue;' +
+                '            ' +
+                '            var category = row.cells[0].textContent.trim();' +
+                '            ' +
+                '            if (currentCategory !== null && category !== currentCategory) {' +
+                '                categoryRows.push({type: \'subtotal\', category: currentCategory, totals: categoryTotals});' +
+                '            }' +
+                '            ' +
+                '            if (category !== currentCategory) {' +
+                '                currentCategory = category;' +
+                '                categoryTotals = {brandAmounts: [], quantities: [], selectedTotal: 0, otherTotal: 0, otherBrandsQty: 0, allTotal: 0, qty: 0, lineCount: 0};' +
+                '            }' +
+                '            ' +
+                '            categoryRows.push({type: \'data\', row: row});' +
+                '            ' +
+                '            var cells = row.cells;' +
+                '            var brandStartCol = 3;' +
+                '            for (var j = 0; j < numBrandCols; j++) {' +
+                '                var cellIndex = brandStartCol + (j * 2);' +
+                '                if (cellIndex < cells.length && cells[cellIndex] && cellIndex + 1 < cells.length && cells[cellIndex + 1]) {' +
+                '                    var amtText = cells[cellIndex].textContent.replace(/[$,()]/g, \'\').trim();' +
+                '                    var val = parseFloat(amtText) || 0;' +
+                '                    categoryTotals.brandAmounts[j] = (categoryTotals.brandAmounts[j] || 0) + val;' +
+                '                    var qtyText = cells[cellIndex + 1].textContent.replace(/[,%]/g, \'\').trim();' +
+                '                    var qty = parseFloat(qtyText) || 0;' +
+                '                    categoryTotals.quantities[j] = (categoryTotals.quantities[j] || 0) + qty;' +
+                '                }' +
+                '            }' +
+                '            ' +
+                '            var selectedCol = brandStartCol + (numBrandCols * 2);' +
+                '            if (selectedCol < cells.length && cells[selectedCol] && selectedCol + 1 < cells.length && cells[selectedCol + 1]) {' +
+                '                var selAmtText = cells[selectedCol].textContent.replace(/[$,()]/g, \'\').trim();' +
+                '                categoryTotals.selectedTotal += parseFloat(selAmtText) || 0;' +
+                '            }' +
+                '            ' +
+                '            var otherCol = brandStartCol + (numBrandCols * 2) + 2;' +
+                '            if (otherCol < cells.length && cells[otherCol] && otherCol + 1 < cells.length && cells[otherCol + 1]) {' +
+                '                var otherAmtText = cells[otherCol].textContent.replace(/[$,()]/g, \'\').trim();' +
+                '                categoryTotals.otherTotal += parseFloat(otherAmtText) || 0;' +
+                '                var otherQtyText = cells[otherCol + 1].textContent.replace(/[,%]/g, \'\').trim();' +
+                '                categoryTotals.otherBrandsQty += parseFloat(otherQtyText) || 0;' +
+                '            }' +
+                '            ' +
+                '            var allCol = brandStartCol + (numBrandCols * 2) + 4;' +
+                '            if (allCol < cells.length && cells[allCol] && allCol + 1 < cells.length && cells[allCol + 1]) {' +
+                '                var allAmtText = cells[allCol].textContent.replace(/[$,()]/g, \'\').trim();' +
+                '                categoryTotals.allTotal += parseFloat(allAmtText) || 0;' +
+                '                var allQtyText = cells[allCol + 1].textContent.replace(/[,%]/g, \'\').trim();' +
+                '                categoryTotals.qty += parseFloat(allQtyText) || 0;' +
+                '            }' +
+                '            ' +
+                '            var lineCountCol = brandStartCol + (numBrandCols * 2) + 6;' +
+                '            if (lineCountCol < cells.length && cells[lineCountCol]) {' +
+                '                var lineCountText = cells[lineCountCol].textContent.trim();' +
+                '                categoryTotals.lineCount += parseInt(lineCountText) || 0;' +
+                '            }' +
+                '        }' +
+                '        ' +
+                '        if (currentCategory !== null) {' +
+                '            categoryRows.push({type: \'subtotal\', category: currentCategory, totals: categoryTotals});' +
+                '        }' +
+                '        ' +
+                '        for (var i = 0; i < categoryRows.length; i++) {' +
+                '            var item = categoryRows[i];' +
+                '            if (item.type === \'data\') {' +
+                '                tbody.appendChild(item.row);' +
+                '            } else if (item.type === \'subtotal\') {' +
+                '                var subtotalRow = document.createElement(\'tr\');' +
+                '                subtotalRow.className = \'category-subtotal-row\';' +
+                '                subtotalRow.setAttribute(\'data-category\', item.category);' +
+                '                ' +
+                '                var labelCell = document.createElement(\'td\');' +
+                '                labelCell.colSpan = 3;' +
+                '                labelCell.textContent = \'Subtotal: \' + item.category;' +
+                '                subtotalRow.appendChild(labelCell);' +
+                '                ' +
+                '                var numBrands = item.totals.brandAmounts.length;' +
+                '                for (var j = 0; j < numBrands; j++) {' +
+                '                    var brandAmt = item.totals.brandAmounts[j] || 0;' +
+                '                    var amtCell = document.createElement(\'td\');' +
+                '                    amtCell.className = \'amount\';' +
+                '                    amtCell.textContent = formatCurrency(brandAmt);' +
+                '                    amtCell.setAttribute(\'title\', \'Quantity: \' + (item.totals.quantities[j] || 0));' +
+                '                    subtotalRow.appendChild(amtCell);' +
+                '                    ' +
+                '                    var pctCell = document.createElement(\'td\');' +
+                '                    pctCell.className = \'center\';' +
+                '                    pctCell.textContent = brandAmt > 0 ? \'100.00%\' : \'0.00%\';' +
+                '                    subtotalRow.appendChild(pctCell);' +
+                '                }' +
+                '                ' +
+                '                var selectedAmtCell = document.createElement(\'td\');' +
+                '                selectedAmtCell.className = \'amount\';' +
+                '                selectedAmtCell.textContent = formatCurrency(item.totals.selectedTotal);' +
+                '                selectedAmtCell.setAttribute(\'title\', \'Quantity: \' + (item.totals.qty || 0));' +
+                '                subtotalRow.appendChild(selectedAmtCell);' +
+                '                ' +
+                '                var selectedPctCell = document.createElement(\'td\');' +
+                '                selectedPctCell.className = \'center\';' +
+                '                selectedPctCell.textContent = item.totals.selectedTotal > 0 ? \'100.00%\' : \'0.00%\';' +
+                '                subtotalRow.appendChild(selectedPctCell);' +
+                '                ' +
+                '                var otherAmtCell = document.createElement(\'td\');' +
+                '                otherAmtCell.className = \'amount\';' +
+                '                otherAmtCell.textContent = formatCurrency(item.totals.otherTotal);' +
+                '                otherAmtCell.setAttribute(\'title\', \'Quantity: \' + (item.totals.otherBrandsQty || 0));' +
+                '                subtotalRow.appendChild(otherAmtCell);' +
+                '                ' +
+                '                var otherPctCell = document.createElement(\'td\');' +
+                '                otherPctCell.className = \'center\';' +
+                '                otherPctCell.textContent = item.totals.otherTotal > 0 ? \'100.00%\' : \'0.00%\';' +
+                '                subtotalRow.appendChild(otherPctCell);' +
+                '                ' +
+                '                var allAmtCell = document.createElement(\'td\');' +
+                '                allAmtCell.className = \'amount\';' +
+                '                allAmtCell.textContent = formatCurrency(item.totals.allTotal);' +
+                '                subtotalRow.appendChild(allAmtCell);' +
+                '                ' +
+                '                var allPctCell = document.createElement(\'td\');' +
+                '                allPctCell.className = \'center\';' +
+                '                allPctCell.textContent = item.totals.allTotal > 0 ? \'100.00%\' : \'0.00%\';' +
+                '                subtotalRow.appendChild(allPctCell);' +
+                '                ' +
+                '                var lineCountCell = document.createElement(\'td\');' +
+                '                lineCountCell.className = \'center\';' +
+                '                lineCountCell.textContent = (item.totals.lineCount || 0).toString();' +
+                '                subtotalRow.appendChild(lineCountCell);' +
+                '                tbody.appendChild(subtotalRow);' +
+                '            }' +
+                '        }' +
+                '        } else {' +
+                '            rows.forEach(function(row) { tbody.appendChild(row); });' +
+                '        }' +
+                '    } else {' +
+                '        rows.forEach(function(row) { tbody.appendChild(row); });' +
+                '        ' +
+                '        var subtotalRows = tbody.querySelectorAll(\'tr.category-subtotal-row\');' +
+                '        for (var i = 0; i < subtotalRows.length; i++) {' +
+                '            subtotalRows[i].style.display = \'none\';' +
+                '        }' +
+                '    }' +
+                '    ' +
                 '    if (summaryRow) tbody.appendChild(summaryRow);' +
+                '    ' +
                 '    table.setAttribute(\'data-sort-col\', columnIndex);' +
                 '    table.setAttribute(\'data-sort-dir\', newDir);' +
                 '    ' +
@@ -1611,13 +1907,29 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        if (row.style.display === \'none\') continue;' +
                 '        var rowData = [];' +
                 '        var cells = row.querySelectorAll(\'td\');' +
-                '        for (var j = 0; j < cells.length; j++) {' +
-                '            var cell = cells[j];' +
-                '            var val = cell.textContent.trim();' +
-                '            if (cell.classList.contains(\'amount\')) {' +
-                '                val = parseFloat(val.replace(/[\\$,]/g, \'\')) || 0;' +
+                '        ' +
+                '        if (row.classList.contains(\'category-subtotal-row\')) {' +
+                '            var firstCell = cells[0];' +
+                '            rowData.push(firstCell.textContent.trim());' +
+                '            rowData.push(\'\');' +
+                '            rowData.push(\'\');' +
+                '            for (var j = 1; j < cells.length; j++) {' +
+                '                var cell = cells[j];' +
+                '                var val = cell.textContent.trim();' +
+                '                if (cell.classList.contains(\'amount\')) {' +
+                '                    val = parseFloat(val.replace(/[\\$,]/g, \'\')) || 0;' +
+                '                }' +
+                '                rowData.push(val);' +
                 '            }' +
-                '            rowData.push(val);' +
+                '        } else {' +
+                '            for (var j = 0; j < cells.length; j++) {' +
+                '                var cell = cells[j];' +
+                '                var val = cell.textContent.trim();' +
+                '                if (cell.classList.contains(\'amount\')) {' +
+                '                    val = parseFloat(val.replace(/[\\$,]/g, \'\')) || 0;' +
+                '                }' +
+                '                rowData.push(val);' +
+                '            }' +
                 '        }' +
                 '        data.push(rowData);' +
                 '    }' +
@@ -1822,7 +2134,7 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        for (var b = 0; b < brandCount; b++) {' +
                 '            var brandAmount = parseFloat(cells[cellIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
                 '            selectedBrandsTotal += brandAmount;' +
-                '            var brandPct = catTotal.brandAmounts[b] > 0 ? (brandAmount / catTotal.brandAmounts[b] * 100).toFixed(2) : \'0.00\';' +
+                '            var brandPct = catTotal.brandAmounts[b] > 0 ? (Math.round(brandAmount / catTotal.brandAmounts[b] * 10000) / 100).toFixed(2) : \'0.00\';' +
                 '            cells[cellIndex + 1].textContent = brandPct + \'%\';' +
                 '            cellIndex += 2;' +
                 '        }' +
@@ -1834,9 +2146,9 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        var allBrandsPctIndex = allBrandsIndex + 1;' +
                 '        var otherBrandsAmount = parseFloat(cells[otherBrandsIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
                 '        var allBrandsAmount = parseFloat(cells[allBrandsIndex].textContent.replace(/[\\$,]/g, \'\')) || 0;' +
-                '        var selectedBrandsPct = catTotal.selectedBrandsTotal > 0 ? (selectedBrandsTotal / catTotal.selectedBrandsTotal * 100).toFixed(2) : \'0.00\';' +
-                '        var otherBrandsPct = catTotal.otherBrandsAmount > 0 ? (otherBrandsAmount / catTotal.otherBrandsAmount * 100).toFixed(2) : \'0.00\';' +
-                '        var allBrandsPct = catTotal.allBrandsAmount > 0 ? (allBrandsAmount / catTotal.allBrandsAmount * 100).toFixed(2) : \'0.00\';' +
+                '        var selectedBrandsPct = catTotal.selectedBrandsTotal > 0 ? (Math.round(selectedBrandsTotal / catTotal.selectedBrandsTotal * 10000) / 100).toFixed(2) : \'0.00\';' +
+                '        var otherBrandsPct = catTotal.otherBrandsAmount > 0 ? (Math.round(otherBrandsAmount / catTotal.otherBrandsAmount * 10000) / 100).toFixed(2) : \'0.00\';' +
+                '        var allBrandsPct = catTotal.allBrandsAmount > 0 ? (Math.round(allBrandsAmount / catTotal.allBrandsAmount * 10000) / 100).toFixed(2) : \'0.00\';' +
                 '        cells[selectedBrandsPctIndex].textContent = selectedBrandsPct + \'%\';' +
                 '        cells[otherBrandsPctIndex].textContent = otherBrandsPct + \'%\';' +
                 '        cells[allBrandsPctIndex].textContent = allBrandsPct + \'%\';' +
