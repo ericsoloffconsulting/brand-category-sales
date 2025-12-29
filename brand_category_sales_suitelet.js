@@ -106,14 +106,14 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
                 var startDate = params.startdate || '2025-01-01';
                 var endDate = params.enddate || '2025-12-31';
                 
-                // Extract brand parameters with defaults only on initial load
-                // If params exist (even as empty string), use them; only default when undefined
-                var brand1Id = params.brand1 !== undefined ? params.brand1 : '48';  // Default: PROFILE
-                var brand2Id = params.brand2 !== undefined ? params.brand2 : '26';  // Default: GE
-                var brand3Id = params.brand3 !== undefined ? params.brand3 : '15';  // Default: CAFE
-                var brand4Id = params.brand4 !== undefined ? params.brand4 : '43';  // Default: MONOGRAM
-                var brand5Id = params.brand5 !== undefined ? params.brand5 : '32';  // Default: HOTPOINT
-                var brand6Id = params.brand6 !== undefined ? params.brand6 : '30';  // Default: HAIER
+                // Extract brand parameters - all default to empty (none selected)
+                // Quick filters now handle initial selections instead of hard-coded defaults
+                var brand1Id = params.brand1 !== undefined ? params.brand1 : '';
+                var brand2Id = params.brand2 !== undefined ? params.brand2 : '';
+                var brand3Id = params.brand3 !== undefined ? params.brand3 : '';
+                var brand4Id = params.brand4 !== undefined ? params.brand4 : '';
+                var brand5Id = params.brand5 !== undefined ? params.brand5 : '';
+                var brand6Id = params.brand6 !== undefined ? params.brand6 : '';
                 
                 log.debug('Brand Parameters', {
                     brand1: brand1Id,
@@ -384,6 +384,8 @@ define(['N/ui/serverWidget', 'N/query', 'N/log', 'N/runtime', 'N/url'],
             if (brand2Id) backUrl += '&brand2=' + encodeURIComponent(brand2Id);
             if (brand3Id) backUrl += '&brand3=' + encodeURIComponent(brand3Id);
             if (brand4Id) backUrl += '&brand4=' + encodeURIComponent(brand4Id);
+            if (brand5Id) backUrl += '&brand5=' + encodeURIComponent(brand5Id);
+            if (brand6Id) backUrl += '&brand6=' + encodeURIComponent(brand6Id);
             html += '<a href="' + backUrl + '" class="back-button">← Back to Summary</a>';
             html += '</div>';
 
@@ -1162,8 +1164,23 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
             
             // Helper function to generate category subtotal row
             function generateCategorySubtotal(category, subtotals, brandCount) {
+                // Build drill-down URL for category
+                var baseUrl = scriptUrl + '&loadData=T&view=detail';
+                var dateParams = '';
+                if (startDate) dateParams += '&startdate=' + encodeURIComponent(startDate);
+                if (endDate) dateParams += '&enddate=' + encodeURIComponent(endDate);
+                if (department) dateParams += '&department=' + encodeURIComponent(department);
+                var brandParams = '';
+                if (brand1Id) brandParams += '&brand1=' + encodeURIComponent(brand1Id);
+                if (brand2Id) brandParams += '&brand2=' + encodeURIComponent(brand2Id);
+                if (brand3Id) brandParams += '&brand3=' + encodeURIComponent(brand3Id);
+                if (brand4Id) brandParams += '&brand4=' + encodeURIComponent(brand4Id);
+                if (brand5Id) brandParams += '&brand5=' + encodeURIComponent(brand5Id);
+                if (brand6Id) brandParams += '&brand6=' + encodeURIComponent(brand6Id);
+                var categoryUrl = baseUrl + '&class1=' + encodeURIComponent(category) + dateParams + brandParams;
+                
                 var subtotalHtml = '<tr class="category-subtotal-row" data-category="' + escapeHtml(category || '') + '">';
-                subtotalHtml += '<td colspan="3">' + escapeHtml(formatDisplayText(category || 'Unknown')) + ' Total</td>';
+                subtotalHtml += '<td colspan="3" onclick="window.location.href=\'' + categoryUrl + '\'" title="Click to view all ' + escapeHtml(formatDisplayText(category || 'Unknown')) + ' items">' + escapeHtml(formatDisplayText(category || 'Unknown')) + ' Total</td>';
                 
                 for (var b = 0; b < brandCount; b++) {
                     var brandAmt = subtotals.brandAmounts[b] || 0;
@@ -1438,8 +1455,9 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '/* Category subtotal row styles */' +
                 '.category-subtotal-row { background: #2E7D32 !important; font-weight: 600; border-top: 2px solid #1B5E20 !important; border-bottom: 2px solid #1B5E20 !important; color: #fff !important; }' +
                 '.category-subtotal-row td { background: #2E7D32 !important; color: #fff !important; }' +
-                'table.data-table tbody tr.category-subtotal-row:hover td { background: #388E3C !important; color: #fff !important; }' +
-                '.category-subtotal-row td:first-child { font-style: italic; padding-left: 20px !important; }' +
+                'table.data-table tbody tr.category-subtotal-row:hover td { background: #fffae6 !important; color: #000 !important; }' +
+                '.category-subtotal-row td:first-child { font-style: italic; padding-left: 20px !important; cursor: pointer; }' +
+                'table.data-table tbody tr.category-subtotal-row:hover td:first-child:hover { background: #FFD700 !important; color: #000 !important; }' +
                 '' +
                 '/* Summary row */' +
                 '.summary-row { background-color: #f0f0f0 !important; border-top: 2px solid #333 !important; font-weight: bold; position: sticky; bottom: 0; z-index: 100; box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1); }' +
@@ -1817,6 +1835,20 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        hideBtn.style.background = \'#f5f5f5\';' +
                 '        hideBtn.style.color = \'#333\';' +
                 '        hideBtn.style.fontWeight = \'normal\';' +
+                '        ' +
+                '        /* When showing subtotals, must sort by category first */' +
+                '        var table = document.getElementById(\'table-\' + sectionId);' +
+                '        if (table) {' +
+                '            var currentSort = table.getAttribute(\'data-sort-col\');' +
+                '            if (currentSort !== \'0\' && currentSort !== null) {' +
+                '                sortTable(sectionId, 0);' +
+                '            } else {' +
+                '                var rows = table.querySelectorAll(\'tbody tr.category-subtotal-row\');' +
+                '                for (var i = 0; i < rows.length; i++) {' +
+                '                    rows[i].style.display = \'\';' +
+                '                }' +
+                '            }' +
+                '        }' +
                 '    } else {' +
                 '        showBtn.style.background = \'#f5f5f5\';' +
                 '        showBtn.style.color = \'#333\';' +
@@ -1824,13 +1856,13 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        hideBtn.style.background = \'#2e5fa3\';' +
                 '        hideBtn.style.color = \'white\';' +
                 '        hideBtn.style.fontWeight = \'bold\';' +
-                '    }' +
-                '    ' +
-                '    var table = document.getElementById(\'table-\' + sectionId);' +
-                '    if (!table) return;' +
-                '    var rows = table.querySelectorAll(\'tbody tr.category-subtotal-row\');' +
-                '    for (var i = 0; i < rows.length; i++) {' +
-                '        rows[i].style.display = showSubtotals ? \'\' : \'none\';' +
+                '        ' +
+                '        var table = document.getElementById(\'table-\' + sectionId);' +
+                '        if (!table) return;' +
+                '        var rows = table.querySelectorAll(\'tbody tr.category-subtotal-row\');' +
+                '        for (var i = 0; i < rows.length; i++) {' +
+                '            rows[i].style.display = \'none\';' +
+                '        }' +
                 '    }' +
                 '}' +
                 '' +
@@ -2056,6 +2088,13 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '                var labelCell = document.createElement(\'td\');' +
                 '                labelCell.colSpan = 3;' +
                 '                labelCell.textContent = item.category + \' Total\';' +
+                '                labelCell.onclick = function(e) {' +
+                '                    var cat = e.target.closest("tr").getAttribute("data-category");' +
+                '                    var baseUrl = window.location.pathname + window.location.search.split("&loadData")[0];' +
+                '                    var url = baseUrl + "&loadData=T&view=detail&class1=" + encodeURIComponent(cat);' +
+                '                    window.location.href = url;' +
+                '                };' +
+                '                labelCell.title = "Click to view all " + item.category + " items";' +
                 '                subtotalRow.appendChild(labelCell);' +
                 '                ' +
                 '                var numBrands = item.totals.brandAmounts.length;' +
@@ -2145,6 +2184,9 @@ function getSummaryData(startDate, endDate, department, brand1Id, brand2Id, bran
                 '        for (var i = 0; i < subtotalRows.length; i++) {' +
                 '            subtotalRows[i].style.display = \'none\';' +
                 '        }' +
+                '        ' +
+                '        /* Update toggle to show "Hide Subtotals" is active when sorting by non-category columns */' +
+                '        setSubtotalsMode(sectionId, false);' +
                 '    }' +
                 '    ' +
                 '    if (summaryRow) tbody.appendChild(summaryRow);' +
